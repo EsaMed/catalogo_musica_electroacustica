@@ -90,17 +90,29 @@ class CatalogoEditor(QWidget):
         self.cargar_csv(CSV_PATH)
 
     def cargar_csv(self, archivo):
-        self.df = pd.read_csv(archivo, encoding="utf-8-sig", index_col=False)
+        self.df = pd.read_csv(archivo, encoding="utf-8-sig", index_col=False)       
         if "Compositor" in self.df.columns:
+            self.df["Compositor"].replace("", pd.NA)
+            self.df["Compositor"] = self.df["Compositor"].ffill()
             self.df["Compositor"] = self.df["Compositor"].apply(normalizar_compositor)
             self.df = unificar_compositores(self.df)
         self.table.setRowCount(len(self.df))
         self.table.setColumnCount(len(self.df.columns))
         self.table.setHorizontalHeaderLabels(self.df.columns)
 
+        comp_anterior = None  # Variable para recordar el compositor anterior
+
         for i in range(len(self.df)):
             for j in range(len(self.df.columns)):
                 valor = str(self.df.iat[i, j]) if not pd.isna(self.df.iat[i, j]) else ""
+
+                # Solo mostrar el compositor en la primera aparición visual
+                if self.df.columns[j] == "Compositor":
+                    if valor == comp_anterior:
+                        valor = ""  # Ocultar nombre repetido visualmente
+                    else:
+                        comp_anterior = valor  # Actualizar referencia
+
                 item = QTableWidgetItem(valor)
                 item.setFlags(item.flags() | Qt.ItemIsEditable)
                 self.table.setItem(i, j, item)
@@ -147,12 +159,30 @@ class CatalogoEditor(QWidget):
             columnas = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
             df_actualizado = pd.DataFrame(datos_actualizados, columns=columnas)
             df_actualizado.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+            
+            # 💡 Rellenar internamente compositores vacíos antes de normalizar
+            df_actualizado["Compositor"].replace("", pd.NA, inplace=True)
+            df_actualizado["Compositor"] = df_actualizado["Compositor"].fillna(method="ffill")
+            df_actualizado["Compositor"] = df_actualizado["Compositor"].apply(normalizar_compositor)
+            df_actualizado = unificar_compositores(df_actualizado)
+            
+             # ✅ Guardar CSV con primera celda y las siguientes en blanco
+            df_visual = df_actualizado.copy()
+            comp_anterior = None
+
+            for i in range(len(df_visual)):
+                comp_actual = df_visual.at[i, "Compositor"]
+                if comp_actual == comp_anterior:
+                    df_visual.at[i, "Compositor"] = ""
+                else:
+                    comp_anterior = comp_actual
+
+            df_visual.to_csv(CSV_PATH, index=False, encoding="utf-8-sig")
+
             QMessageBox.information(self, "Éxito", "Archivo guardado correctamente.")
             self.df = df_actualizado  # Actualiza el DataFrame interno
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo guardar el archivo:\n{str(e)}")
-
-    
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
