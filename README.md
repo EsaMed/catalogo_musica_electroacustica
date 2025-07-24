@@ -54,5 +54,7 @@ https://github.com/EsaMed
 ---
 
 Este trabajo es parte del proyecto Fondecyt de Iniciación 11241059
+"Establishing foundations for the implementation of neutral level analysis of the spa-
+tial composition of acousmatic works"
 
 <img width="1352" height="642" alt="imagen" src="https://github.com/user-attachments/assets/48f0834f-db3e-438d-ae56-b8241c5f8e8c" />
