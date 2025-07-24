@@ -17,7 +17,7 @@ La aplicación permite agregar, eliminar y guardar obras directamente desde una 
 
 ### 1. Requisitos
 
-- Python 3.x
+- Python 3.12.3
 - PyQt5
 - pandas
 
