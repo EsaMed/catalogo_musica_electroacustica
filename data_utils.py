@@ -1,5 +1,6 @@
 # data_utils.py
 import pandas as pd
+import re
 
 def normalizar_compositor(nombre):
     """
@@ -69,3 +70,44 @@ def preparar_para_guardar(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 comp_prev = comp
     return df2
+
+def formatear_compositor_para_csv(nombre: str) -> str:
+    """
+    Recibe variantes como:
+      - "Esau Medina"
+      - "Medina, Esau"
+      - "Medina, Esau (1980–)"
+      - "Esau Medina (1980–)"
+    y devuelve "Apellido, Nombre (fechas)" cuando es posible.
+    No toca tildes ni capitalización: respeta lo escrito.
+    """
+    if not isinstance(nombre, str):
+        return ""
+    s = nombre.strip()
+    if not s:
+        return ""
+
+    # Extraer fechas entre paréntesis (si existen) y quitarlas del base
+    m = re.search(r"\([^)]*\)", s)
+    fechas = m.group(0).strip() if m else ""
+    base = (s[:m.start()] + s[m.end():]).strip() if m else s
+
+    # Colapsar espacios
+    base = " ".join(base.split())
+
+    # Si ya viene "Apellido, Nombre" => normaliza espacio tras coma
+    if "," in base:
+        ap, nom = [p.strip() for p in base.split(",", 1)]
+        base_fmt = f"{ap}, {nom}" if nom else ap
+    else:
+        # Asume "Nombre(s) Apellido" (última palabra = apellido)
+        trozos = base.split()
+        if len(trozos) >= 2:
+            ap = trozos[-1]
+            nom = " ".join(trozos[:-1])
+            base_fmt = f"{ap}, {nom}"
+        else:
+            # Un solo token: no hay forma de separar con certeza
+            base_fmt = base
+
+    return f"{base_fmt} {fechas}".strip()

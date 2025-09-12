@@ -14,6 +14,8 @@ from data_utils import (
 )
 import unicodedata
 import re
+from data_utils import formatear_compositor_para_csv
+
 # ---------------------------
 # Diálogo para agregar obra
 # ---------------------------
@@ -75,9 +77,9 @@ class DialogoAgregarObra(QDialog):
 # Ventana principal
 # ---------------------------
 class CatalogoEditor(QWidget):
-    def __init__(self, csv_path="catalogo_inicial.csv", lupa_icon="lupa.png"):
+    def __init__(self, storage, lupa_icon="lupa.png"):
         super().__init__()
-        self.csv_path = csv_path
+        self.storage = storage
         self.lupa_icon = lupa_icon
 
         self.setWindowTitle("Editor de Catálogo Electroacústico")
@@ -125,7 +127,7 @@ class CatalogoEditor(QWidget):
         self.layout.addWidget(self.save_button)
 
         # Carga inicial
-        self.df = cargar_catalogo(self.csv_path)
+        self.df = self.storage.load()
         self.mostrar_tabla(self.df)
 
     # ---------------------------
@@ -180,6 +182,13 @@ class CatalogoEditor(QWidget):
         if dialogo.exec_() == dialogo.Accepted:
             datos = dialogo.obtener_datos()
 
+            #formatear sólo la columna Compositor antes de insertar
+            try:
+                col_idx = list(self.df.columns).index("Compositor")
+                datos[col_idx] = formatear_compositor_para_csv(datos[col_idx])
+            except ValueError:
+                pass  # si no existe la columna, no pasa nada
+
             # En la tabla (al final)
             fila_nueva = self.table.rowCount()
             self.table.insertRow(fila_nueva)
@@ -223,21 +232,23 @@ class CatalogoEditor(QWidget):
             columnas = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
             df_actualizado = pd.DataFrame(datos, columns=columnas)
 
+            df_actualizado["Compositor"] = df_actualizado["Compositor"].apply(formatear_compositor_para_csv)
+
             # Normalización y unificación
             if "Compositor" in df_actualizado.columns:
                 df_actualizado["Compositor"] = df_actualizado["Compositor"].replace("", pd.NA).ffill()
                 df_actualizado["Compositor"] = df_actualizado["Compositor"].apply(normalizar_compositor)
                 df_actualizado = unificar_compositores(df_actualizado)
 
-            # Preparar versión visual para CSV y guardar
-            df_visual = preparar_para_guardar(df_actualizado)
-            df_visual.to_csv(self.csv_path, index=False, encoding="utf-8-sig")
+            
+            self.storage.save(df_actualizado)
 
-            QMessageBox.information(self, "Éxito", "Archivo guardado correctamente.")
-            self.df = df_actualizado  # estado interno actualizado
+            # 5) Estado y feedback
+            self.df = df_actualizado  # mantener estado interno consistente
+            QMessageBox.information(self, "Éxito", "Catálogo guardado en Google Drive.")
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"No se pudo guardar el archivo:\n{str(e)}")
+            QMessageBox.critical(self, "Error", f"No se pudo guardar en Drive:\n{str(e)}")
 
     # ---------------------------
     # Búsqueda
