@@ -27,7 +27,7 @@ pip install PyQt5 pandas
 
 ### 2. Ejecutar
 
-python interf.py
+python app.py
 
 
 ## Funcionalidad del buscador
