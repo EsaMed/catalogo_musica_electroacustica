@@ -12,7 +12,8 @@ from data_utils import (
     cargar_catalogo, preparar_para_guardar,
     normalizar_compositor, unificar_compositores
 )
-
+import unicodedata
+import re
 # ---------------------------
 # Diálogo para agregar obra
 # ---------------------------
@@ -241,15 +242,109 @@ class CatalogoEditor(QWidget):
     # ---------------------------
     # Búsqueda
     # ---------------------------
+
+    def _normalize(self, s: str) -> str:
+        """Minúsculas + sin tildes/diacríticos."""
+        if not s:
+            return ""
+        s = str(s).lower().strip()
+        # Eliminar tildes usando NFD
+        s = unicodedata.normalize("NFD", s)
+        s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+        # Colapsar espacios
+        s = " ".join(s.split())
+            
+        return s
+
+    def _sin_parentesis(self, s: str) -> str:
+        """Quita todo lo que esté entre paréntesis (p.ej. fechas)."""
+        if not s:
+            return ""
+        return re.sub(r"\([^)]*\)", "", s).strip()
+
+
     def buscar(self):
-        texto = self.search_input.text().strip().lower()
+        """
+        Filtra filas de forma insensible a tildes y al orden nombre/apellido.
+        Para 'Compositor', usa el valor REAL de self.df (puede estar oculto en la vista),
+        y genera variantes sin paréntesis para que 'Alejandro Albornoz' matchee
+        aunque el dato sea 'Albornoz, Alejandro (1970–)'.
+        """
+        query = self._normalize(self.search_input.text())
+        if not query:
+            self.restablecer_busqueda()
+            return
+
+        # Mapa de headers (por si cambiaste el orden de columnas)
+        headers = [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+        try:
+            col_compositor = headers.index("Compositor")
+        except ValueError:
+            col_compositor = -1
+
         for fila in range(self.table.rowCount()):
             visible = False
+
+            # 1) Búsqueda general: cualquier columna (lo que se ve en la tabla)
+            fila_texto_norm = []
             for col in range(self.table.columnCount()):
                 item = self.table.item(fila, col)
-                if item and texto in item.text().lower():
+                texto_celda = item.text() if item else ""
+                norm = self._normalize(texto_celda)
+                fila_texto_norm.append(norm)
+                if query in norm:
                     visible = True
                     break
+
+            # 2) Tratamiento especial para 'Compositor' usando el valor real del DF
+            if not visible and col_compositor != -1:
+                try:
+                    comp_full = str(self.df.at[fila, "Compositor"])
+                except Exception:
+                    comp_full = self.table.item(fila, col_compositor).text() if self.table.item(fila, col_compositor) else ""
+
+                comp_full = comp_full.strip()
+
+                # versión sin paréntesis (p.ej. quitar fechas)
+                comp_sin_paren = self._sin_parentesis(comp_full)
+
+                variantes = set()
+
+                # Base: tal cual y sin paréntesis
+                variantes.add(self._normalize(comp_full))
+                variantes.add(self._normalize(comp_sin_paren))
+
+                # Sin coma (y colapsando espacios)
+                sin_coma_full = " ".join(comp_full.replace(",", " ").split())
+                sin_coma_sin_paren = " ".join(comp_sin_paren.replace(",", " ").split())
+                variantes.add(self._normalize(sin_coma_full))
+                variantes.add(self._normalize(sin_coma_sin_paren))
+
+                # Si viene como "Apellido, Nombre (...)"
+                fuente = comp_sin_paren if comp_sin_paren else comp_full
+                if "," in fuente:
+                    ap, nom = [p.strip() for p in fuente.split(",", 1)]
+                    # "Nombre Apellido" y "Apellido Nombre"
+                    variantes.add(self._normalize(f"{nom} {ap}"))
+                    variantes.add(self._normalize(f"{ap} {nom}"))
+                    # También sus versiones sin espacios extra
+                    variantes.add(self._normalize(f"{nom}{ap}"))
+                    variantes.add(self._normalize(f"{ap}{nom}"))
+                    # Solo nombre / solo apellido
+                    variantes.add(self._normalize(nom))
+                    variantes.add(self._normalize(ap))
+                else:
+                    # Si no hay coma, intenta partir por espacios y permutar
+                    trozos = fuente.split()
+                    if len(trozos) >= 2:
+                        ap = trozos[-1]
+                        nom = " ".join(trozos[:-1])
+                        variantes.add(self._normalize(f"{nom} {ap}"))
+                        variantes.add(self._normalize(f"{ap} {nom}"))
+
+                if any(query in v for v in variantes):
+                    visible = True
+
             self.table.setRowHidden(fila, not visible)
 
     def restablecer_busqueda(self):
