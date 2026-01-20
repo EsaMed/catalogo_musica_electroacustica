@@ -32,9 +32,6 @@ pip install PyQt5 pandas google-api-python-client google-auth google-auth-oauthl
 
 ## Ejecución
 
-Desde la carpeta del proyecto:
-
-
 python app.py
 
 
