@@ -1,60 +1,71 @@
 # Catálogo de Música Electroacústica en Chile
 
-Este proyecto es una herramienta interactiva para visualizar, editar y actualizar un catálogo de obras de música electroacústica producidas en Chile. 
-La aplicación permite agregar, eliminar y guardar obras directamente desde una interfaz gráfica.
+Este proyecto es una aplicación de escritorio para **visualizar, editar y mantener un catálogo de obras de música electroacústica producidas en Chile**, mediante una interfaz gráfica simple y directa.
 
-## Características principales
+El catálogo se almacena como un archivo CSV en **Google Drive**, lo que permite trabajar de forma centralizada y mantener una única versión actualizada.
 
-- Visualización de un catálogo en formato de tabla editable.
-- Añadir nuevas obras mediante un formulario emergente.
-- Eliminar entradas seleccionadas.
-- Búsqueda por compositor, título de obra, año, etc.
-- Guarda los cambios en un archivo CSV.
+---
+
+## Características
+
+- Visualización del catálogo en una tabla editable.
+- Agregar nuevas obras mediante un formulario.
+- Eliminar obras seleccionadas.
+- Búsqueda flexible por compositor, obra, año u otros campos.
 - Normalización automática de nombres de compositores.
+- Guardado directo del catálogo en Google Drive (CSV).
+
+---
+
+## Requisitos
+
+- Python 3.12
+- PyQt5
+- pandas
+- Google API Client (Drive)
+
+Instalación de dependencias principales:
+
+
+pip install PyQt5 pandas google-api-python-client google-auth google-auth-oauthlib
 
 
 ## Ejecución
 
-### 1. Requisitos
-
-- Python 3.12.3
-- PyQt5
-- pandas
-
-Instalación:
-
-pip install PyQt5 pandas
-
-### 2. Ejecutar
-
-python interf.py
+Desde la carpeta del proyecto:
 
 
-## Funcionalidad del buscador
-
-El campo de búsqueda permite filtrar rápidamente entradas por cualquiera de los campos (compositor, obra, año, etc.). Se puede activar presionando `Enter` o haciendo clic en el ícono de buscar.
-
-El botón ✖ permite restablecer el catálogo completo tras una búsqueda.
+python app.py
 
 
-## Próximas mejoras
+Es necesario contar con:
+- `credentials.json` (OAuth de Google)
+- `token.json` (se genera automáticamente al primer inicio de sesión)
+- El `FILE_ID` correcto del archivo CSV en Google Drive
 
-- Mejoras gráficas en interfaz
-- Versión Standalone (.exe)
-- Versión web sincronizada con la base de datos remota.
-- Control de versiones de cambios en el catálogo.
-- Cambio a estructura modular
+---
+
+## Búsqueda
+
+El buscador permite filtrar obras de forma insensible a:
+- mayúsculas y minúsculas
+- tildes
+- orden nombre/apellido del compositor
+- presencia o ausencia de fechas entre paréntesis
+
+El botón ✖ restablece la vista completa del catálogo.
 
 
 ## Autor
 
-Esaú Medina Lucero  
+**Esaú Medina Lucero**  
 https://github.com/EsaMed
+
+Este trabajo forma parte del proyecto **Fondecyt de Iniciación 11241059**  
+*“Establishing foundations for the implementation of neutral level analysis of the spatial composition of acousmatic works”*
 
 ---
 
-Este trabajo es parte del proyecto Fondecyt de Iniciación 11241059
+## Captura de la aplicación
 
-"Establishing foundations for the implementation of neutral level analysis of the spatial composition of acousmatic works"
-
-<img width="1352" height="642" alt="imagen" src="https://github.com/user-attachments/assets/48f0834f-db3e-438d-ae56-b8241c5f8e8c" />
+![Vista del editor del catálogo electroacústico](docs/screenshot.png)
