@@ -34,38 +34,41 @@ class DriveStorage(CatalogStorage):
         self.token_path = token_path
         
         creds = None
-        
-        # ---LÓGICA PARA LA WEB ---
+        is_web = False
+
+        # 1. INTENTO PARA LA WEB (Blindado contra errores de Streamlit)
         try:
-            
             if "google" in st.secrets:
                 token_info = json.loads(st.secrets["google"]["token"])
                 creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+                is_web = True
         except Exception:
-            
+            # Si no hay secretos (entorno local), simplemente ignoramos
             pass
         
-        # --- LÓGICA LOCAL DE SIEMPRE ---
-        if not creds and os.path.exists(token_path):
+        # 2. INTENTO LOCAL (Si no estamos en la web y el archivo existe)
+        if not is_web and os.path.exists(token_path):
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
 
-        # 3. SI EL TOKEN EXPIRÓ, INTENTAR RENOVARLO
+        # 3. RENOVACIÓN DE TOKEN (Si expiró)
         if creds and creds.expired and creds.refresh_token:
+            from google.auth.transport.requests import Request
             creds.refresh(Request())
-            if "google" not in st.secrets:
+            # Solo guardamos el archivo si estamos en local
+            if not is_web:
                 with open(self.token_path, "w") as f:
                     f.write(creds.to_json())
 
-        # 4. SI NO HAY CREDENCIALES VÁLIDAS, LOGIN INTERACTIVO
+        # 4. LOGIN INTERACTIVO (Solo si falló todo lo anterior y no es web)
         if not creds or not creds.valid:
-            flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, SCOPES)
-            creds = flow.run_local_server(
-                port=0, 
-                access_type='offline', 
-                prompt='consent'
-            )
-            with open(self.token_path, "w") as f:
-                f.write(creds.to_json())
+            if is_web:
+                st.error("Error crítico: Las credenciales de la web no son válidas.")
+                st.stop()
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, SCOPES)
+                creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
+                with open(self.token_path, "w") as f:
+                    f.write(creds.to_json())
 
         # CREACIÓN DEL SERVICIO ÚNICO
         self.service = build("drive", "v3", credentials=creds)
