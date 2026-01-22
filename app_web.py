@@ -65,31 +65,37 @@ st.dataframe(
 st.divider()
 st.subheader("🗑️ Eliminar Obra")
 
-# Obtenemos la lista de obras del DataFrame actual (el original, no el estético)
-# Si hay una búsqueda, limitamos las opciones a lo que se ve en pantalla
 df_visible = st.session_state.df[mask] if busqueda else st.session_state.df
 
 if not df_visible.empty:
-    # Creamos una etiqueta clara: "Obra (Compositor)"
-    lista_obras = df_visible.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
-    obra_seleccionada_label = st.selectbox("Selecciona la obra que deseas eliminar definitivamente:", lista_obras)
+    # 1. Creamos la lista y añadimos una opción vacía al inicio
+    opciones = [""] + df_visible.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
     
-    if st.button("Eliminar obra seleccionada", type="secondary"):
-        # Extraemos el nombre de la obra del label (todo antes del " - [")
-        nombre_obra = obra_seleccionada_label.split(" - [")[0]
-        nombre_comp = obra_seleccionada_label.split(" - [")[1].replace("]", "")
-        
-        # Buscamos el índice en el DataFrame original
-        idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
-                                  (st.session_state.df['Compositor'] == nombre_comp)].index
-        
-        if not idx.empty:
-            st.session_state.df = st.session_state.df.drop(idx).reset_index(drop=True)
-            # Guardamos inmediatamente para que el cambio sea permanente en Drive
-            with st.spinner("Eliminando de Drive..."):
-                storage.save(st.session_state.df)
-            st.success(f"Obra '{nombre_obra}' eliminada con éxito.")
-            st.rerun()
+    # 2. El buscador ahora empieza vacío (index=0 es "")
+    seleccion = st.selectbox(
+        "Busca y selecciona la obra que deseas eliminar:",
+        options=opciones,
+        index=0,
+        help="Escribe el nombre de la obra o compositor para filtrar"
+    )
+    
+    # 3. Solo mostramos el botón si se ha seleccionado algo distinto a la opción vacía
+    if seleccion != "":
+        if st.button("Eliminar obra seleccionada", type="secondary"):
+            nombre_obra = seleccion.split(" - [")[0]
+            nombre_comp = seleccion.split(" - [")[1].replace("]", "")
+            
+            idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
+                                      (st.session_state.df['Compositor'] == nombre_comp)].index
+            
+            if not idx.empty:
+                st.session_state.df = st.session_state.df.drop(idx).reset_index(drop=True)
+                with st.spinner("Eliminando de Drive..."):
+                    storage.save(st.session_state.df)
+                st.success(f"Obra '{nombre_obra}' eliminada con éxito.")
+                st.rerun()
+    else:
+        st.info("Selecciona una obra del buscador para habilitar la eliminación.")
 else:
     st.info("No hay obras disponibles para eliminar con los filtros actuales.")
 
