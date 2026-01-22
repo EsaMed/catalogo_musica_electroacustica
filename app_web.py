@@ -61,54 +61,48 @@ st.dataframe(
     hide_index=True,
 )
 
-# --- BLOQUE DE ELIMINACIÓN MULTIPLE Y LIMPIA ---
+# --- BLOQUE DE ELIMINACIÓN TIPO BUSCADOR LIMPIO ---
 st.divider()
 st.subheader("🗑️ Eliminar Obras")
 
-df_visible = st.session_state.df[mask] if busqueda else st.session_state.df
+# 1. Cuadro de texto para la búsqueda (Sin flechas, solo texto)
+termino_busqueda = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre de la obra o compositor...")
 
-if not df_visible.empty:
-    # 1. Creamos la lista de opciones
-    opciones = df_visible.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
+if termino_busqueda:
+    # 2. Filtramos las opciones basadas en lo que escribiste
+    opciones_filtradas = st.session_state.df[
+        st.session_state.df.apply(lambda row: row.astype(str).str.contains(termino_busqueda, case=False).any(), axis=1)
+    ]
     
-    # 2. Usamos multiselect para buscar y seleccionar varias a la vez
-    selecciones = st.multiselect(
-        "Busca y selecciona las obras que deseas eliminar:",
-        options=opciones,
-        placeholder="Escribe para buscar (ej: Medina)",
-        help="Puedes seleccionar varias obras para eliminarlas en lote"
-    )
-    
-    # 3. Solo mostramos el botón si hay al menos una selección
-    if selecciones:
-        cantidad = len(selecciones)
-        mensaje_boton = f"Eliminar {cantidad} obra(s) seleccionada(s)"
+    if not opciones_filtradas.empty:
+        # 3. Solo si hay resultados, mostramos el multiselect para confirmar la selección
+        opciones_lista = opciones_filtradas.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
         
-        if st.button(mensaje_boton, type="secondary"):
-            indices_a_borrar = []
-            
-            for item in selecciones:
-                # Extraemos datos para identificar la fila exacta
-                nombre_obra = item.split(" - [")[0]
-                nombre_comp = item.split(" - [")[1].replace("]", "")
+        selecciones = st.multiselect(
+            f"Resultados para '{termino_busqueda}':",
+            options=opciones_lista,
+            default=opciones_lista if len(opciones_lista) == 1 else None, # Si solo hay uno, lo pre-selecciona
+            help="Selecciona de la lista los que realmente quieres borrar"
+        )
+        
+        if selecciones:
+            if st.button(f"Confirmar eliminación de {len(selecciones)} obra(s)", type="primary"):
+                indices_a_borrar = []
+                for item in selecciones:
+                    nombre_obra = item.split(" - [")[0]
+                    nombre_comp = item.split(" - [")[1].replace("]", "")
+                    idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
+                                              (st.session_state.df['Compositor'] == nombre_comp)].index
+                    indices_a_borrar.extend(idx.tolist())
                 
-                idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
-                                          (st.session_state.df['Compositor'] == nombre_comp)].index
-                indices_a_borrar.extend(idx.tolist())
-            
-            if indices_a_borrar:
-                # Eliminamos todas las seleccionadas de una vez
                 st.session_state.df = st.session_state.df.drop(indices_a_borrar).reset_index(drop=True)
-                
-                with st.spinner("Actualizando Drive..."):
-                    storage.save(st.session_state.df)
-                
-                st.success(f"Se han eliminado {len(indices_a_borrar)} obras correctamente.")
+                storage.save(st.session_state.df)
+                st.success("Eliminación completada.")
                 st.rerun()
     else:
-        st.info("Escribe en el cuadro de arriba para buscar obras.")
+        st.warning(f"No se encontraron obras que coincidan con '{termino_busqueda}'")
 else:
-    st.info("No hay obras disponibles para eliminar.")
+    st.info("Ingresa un nombre arriba para comenzar a buscar obras.")
 
 # --- BOTÓN DE GUARDADO GENERAL ---
 st.divider()
