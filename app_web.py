@@ -61,43 +61,54 @@ st.dataframe(
     hide_index=True,
 )
 
-# --- BLOQUE DE ELIMINACIÓN ---
+# --- BLOQUE DE ELIMINACIÓN MULTIPLE Y LIMPIA ---
 st.divider()
-st.subheader("🗑️ Eliminar Obra")
+st.subheader("🗑️ Eliminar Obras")
 
 df_visible = st.session_state.df[mask] if busqueda else st.session_state.df
 
 if not df_visible.empty:
-    # 1. Creamos la lista y añadimos una opción vacía al inicio
-    opciones = [""] + df_visible.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
+    # 1. Creamos la lista de opciones
+    opciones = df_visible.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
     
-    # 2. El buscador ahora empieza vacío (index=0 es "")
-    seleccion = st.selectbox(
-        "Busca y selecciona la obra que deseas eliminar:",
+    # 2. Usamos multiselect para buscar y seleccionar varias a la vez
+    selecciones = st.multiselect(
+        "Busca y selecciona las obras que deseas eliminar:",
         options=opciones,
-        index=0,
-        help="Escribe el nombre de la obra o compositor para filtrar"
+        placeholder="Escribe para buscar (ej: Medina)",
+        help="Puedes seleccionar varias obras para eliminarlas en lote"
     )
     
-    # 3. Solo mostramos el botón si se ha seleccionado algo distinto a la opción vacía
-    if seleccion != "":
-        if st.button("Eliminar obra seleccionada", type="secondary"):
-            nombre_obra = seleccion.split(" - [")[0]
-            nombre_comp = seleccion.split(" - [")[1].replace("]", "")
+    # 3. Solo mostramos el botón si hay al menos una selección
+    if selecciones:
+        cantidad = len(selecciones)
+        mensaje_boton = f"Eliminar {cantidad} obra(s) seleccionada(s)"
+        
+        if st.button(mensaje_boton, type="secondary"):
+            indices_a_borrar = []
             
-            idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
-                                      (st.session_state.df['Compositor'] == nombre_comp)].index
+            for item in selecciones:
+                # Extraemos datos para identificar la fila exacta
+                nombre_obra = item.split(" - [")[0]
+                nombre_comp = item.split(" - [")[1].replace("]", "")
+                
+                idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
+                                          (st.session_state.df['Compositor'] == nombre_comp)].index
+                indices_a_borrar.extend(idx.tolist())
             
-            if not idx.empty:
-                st.session_state.df = st.session_state.df.drop(idx).reset_index(drop=True)
-                with st.spinner("Eliminando de Drive..."):
+            if indices_a_borrar:
+                # Eliminamos todas las seleccionadas de una vez
+                st.session_state.df = st.session_state.df.drop(indices_a_borrar).reset_index(drop=True)
+                
+                with st.spinner("Actualizando Drive..."):
                     storage.save(st.session_state.df)
-                st.success(f"Obra '{nombre_obra}' eliminada con éxito.")
+                
+                st.success(f"Se han eliminado {len(indices_a_borrar)} obras correctamente.")
                 st.rerun()
     else:
-        st.info("Selecciona una obra del buscador para habilitar la eliminación.")
+        st.info("Escribe en el cuadro de arriba para buscar obras.")
 else:
-    st.info("No hay obras disponibles para eliminar con los filtros actuales.")
+    st.info("No hay obras disponibles para eliminar.")
 
 # --- BOTÓN DE GUARDADO GENERAL ---
 st.divider()
