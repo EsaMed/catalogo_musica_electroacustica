@@ -1,0 +1,7 @@
+credentials.json
+token.json
+catalogo.csv
+*.ipynb
+*.txt
+!requirements.txt
+__pycache__
