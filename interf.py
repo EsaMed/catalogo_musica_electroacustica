@@ -6,12 +6,16 @@ from PyQt5.QtWidgets import (
     QDialogButtonBox, QFormLayout, QHBoxLayout
 )
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtGui import QIcon, QColor, QBrush
+from PyQt5.QtWidgets import QHeaderView
+from PyQt5.QtGui import QPainter, QPen
+
 
 CSV_PATH = "catalogo_inicial.csv"  # Ruta al CSV base
 
+# =========================
 # Funciones auxiliares
-
+# =========================
 def normalizar_compositor(nombre):
     """Elimina paréntesis en nombres de compositores si están rodeando el nombre."""
     if pd.isna(nombre):
@@ -39,7 +43,43 @@ def unificar_compositores(df):
     df["Compositor"] = df["Compositor"].apply(reemplazar)
     return df
 
-# Diálogo para agregar una obra nueva
+# =========================
+# Diálogo para agregar obra
+# =========================
+class ColoredHeader(QHeaderView):
+    """
+    QHeaderView personalizado que pinta cada sección (columna) con un color pastel.
+    """
+    def __init__(self, colors, orientation=Qt.Horizontal, parent=None):
+        super().__init__(orientation, parent)
+        self.colors = colors
+        # Altura un poco mayor para que respire
+        self.setFixedHeight(28)
+        # Texto centrado por defecto
+        self.setDefaultAlignment(Qt.AlignCenter)
+
+    def paintSection(self, painter, rect, logicalIndex):
+        if not rect.isValid():
+            return super().paintSection(painter, rect, logicalIndex)
+
+        # Color pastel para esta columna
+        color = self.colors[logicalIndex % len(self.colors)]
+
+        painter.save()
+        # Fondo pastel
+        painter.fillRect(rect, QColor(color))
+
+        # Borde inferior sutil
+        pen = QPen(QColor("#e5e7eb"))
+        painter.setPen(pen)
+        painter.drawLine(rect.bottomLeft(), rect.bottomRight())
+
+        # Texto del header (lo trae el modelo)
+        text = self.model().headerData(logicalIndex, self.orientation(), Qt.DisplayRole)
+        painter.setPen(QColor("#222222"))  # color de texto oscuro
+        painter.drawText(rect, Qt.AlignCenter, str(text) if text is not None else "")
+
+        painter.restore()
 
 class DialogoAgregarObra(QDialog):
     def __init__(self, columnas, parent=None):
@@ -59,8 +99,9 @@ class DialogoAgregarObra(QDialog):
     def obtener_datos(self):
         return [self.entradas[col].text() for col in self.entradas]
 
+# =========================
 # Ventana principal
-
+# =========================
 class CatalogoEditor(QWidget):
     def __init__(self):
         super().__init__()
@@ -123,11 +164,33 @@ class CatalogoEditor(QWidget):
 
         self.mostrar_tabla(self.df)
 
+
     def mostrar_tabla(self, df):
         """Muestra el DataFrame en la tabla, ocultando compositores repetidos."""
         self.table.setRowCount(len(df))
         self.table.setColumnCount(len(df.columns))
         self.table.setHorizontalHeaderLabels(df.columns)
+
+        # Colorear encabezados después de definir los labels
+        # Paleta pastel
+        colores_pastel = [
+            "#F9E2E7", "#E1F0FF", "#E6F5D6", "#FFF4C2", "#E8D5F7",
+            "#D1F2EB", "#FDE2E2", "#DBEAFE", "#FEF9C3", "#E0F7FA",
+            "#F3E8FF", "#E8F5E9", "#FFF9E6", "#EDE7F6", "#E0F2F1"
+        ]
+
+        # Sustituye el header horizontal por uno coloreado
+        header = ColoredHeader(colores_pastel, Qt.Horizontal, self.table)
+        self.table.setHorizontalHeader(header)
+
+        # (Opcional) Estilo fino para el header (bordes, padding)
+        self.table.horizontalHeader().setStyleSheet("""
+            QHeaderView::section {
+                border: 0px;
+                padding: 6px;
+            }
+        """)
+
 
         comp_anterior = None
         for i in range(len(df)):
@@ -234,7 +297,9 @@ class CatalogoEditor(QWidget):
             self.table.setRowHidden(fila, False)
         self.search_input.clear()
 
+# =========================
 # Inicio de la aplicación
+# =========================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     ventana = CatalogoEditor()
