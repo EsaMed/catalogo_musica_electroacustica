@@ -1,7 +1,17 @@
 import streamlit as st
 import pandas as pd
+import unicodedata
 from storage import DriveStorage
 from data_utils import formatear_compositor_para_csv, preparar_para_guardar
+
+# --- FUNCIÓN PARA IGNORAR TILDES ---
+def remover_tildes(texto):
+    """Convierte a minúsculas y elimina acentos de un texto."""
+    if not isinstance(texto, str):
+        texto = str(texto)
+    # Normaliza a NFD (separa la letra del acento) y filtra los acentos
+    texto_norm = unicodedata.normalize('NFD', texto)
+    return "".join(c for c in texto_norm if unicodedata.category(c) != 'Mn').lower()
 
 st.set_page_config(page_title="Catálogo de Música Electroacústica", layout="wide")
 
@@ -13,7 +23,6 @@ def inicializar_almacenamiento():
 
 storage = inicializar_almacenamiento()
 
-# Inicializar el DataFrame en la sesión si no existe
 if 'df' not in st.session_state:
     st.session_state.df = storage.load()
 
@@ -35,10 +44,8 @@ def agregar_obra_form():
         
         nueva_fila = pd.DataFrame([datos_nuevos])
         st.session_state.df = pd.concat([st.session_state.df, nueva_fila], ignore_index=True)
-        # Nota: Aquí no guardamos en Drive aún, solo en la sesión
         st.rerun()
 
-# --- INTERFAZ DE ACCIONES ---
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("➕ Agregar nueva obra"):
@@ -47,41 +54,44 @@ with col1:
 # --- VISUALIZACIÓN DE LA TABLA ---
 st.subheader("Catálogo")
 
-# Creamos la versión estética (con nombres blanqueados si se repiten)
 df_estetico = preparar_para_guardar(st.session_state.df)
 
-# Filtro de búsqueda
 if busqueda:
-    mask = st.session_state.df.apply(lambda row: row.astype(str).str.contains(busqueda, case=False).any(), axis=1)
+    # Normalizamos la búsqueda del usuario
+    busqueda_norm = remover_tildes(busqueda)
+    # Aplicamos la normalización a cada celda de la fila para comparar
+    mask = st.session_state.df.apply(
+        lambda row: row.astype(str).apply(remover_tildes).str.contains(busqueda_norm).any(), 
+        axis=1
+    )
     df_estetico = df_estetico[mask]
 
-st.dataframe(
-    df_estetico,
-    use_container_width=True,
-    hide_index=True,
-)
+st.dataframe(df_estetico, use_container_width=True, hide_index=True)
 
 # --- BLOQUE DE ELIMINACIÓN TIPO BUSCADOR LIMPIO ---
 st.divider()
 st.subheader("🗑️ Eliminar Obras")
 
-# 1. Cuadro de texto para la búsqueda (Sin flechas, solo texto)
 termino_busqueda = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre de la obra o compositor...")
 
 if termino_busqueda:
-    # 2. Filtramos las opciones basadas en lo que escribiste
-    opciones_filtradas = st.session_state.df[
-        st.session_state.df.apply(lambda row: row.astype(str).str.contains(termino_busqueda, case=False).any(), axis=1)
-    ]
+    # Normalizamos el término de búsqueda
+    termino_norm = remover_tildes(termino_busqueda)
+    
+    # Filtramos las opciones ignorando tildes
+    mask_elim = st.session_state.df.apply(
+        lambda row: row.astype(str).apply(remover_tildes).str.contains(termino_norm).any(), 
+        axis=1
+    )
+    opciones_filtradas = st.session_state.df[mask_elim]
     
     if not opciones_filtradas.empty:
-        # 3. Solo si hay resultados, mostramos el multiselect para confirmar la selección
         opciones_lista = opciones_filtradas.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
         
         selecciones = st.multiselect(
             f"Resultados para '{termino_busqueda}':",
             options=opciones_lista,
-            default=opciones_lista if len(opciones_lista) == 1 else None, # Si solo hay uno, lo pre-selecciona
+            default=opciones_lista if len(opciones_lista) == 1 else None,
             help="Selecciona de la lista los que realmente quieres borrar"
         )
         
@@ -104,7 +114,6 @@ if termino_busqueda:
 else:
     st.info("Ingresa un nombre arriba para comenzar a buscar obras.")
 
-# --- BOTÓN DE GUARDADO GENERAL ---
 st.divider()
 if st.button("💾 Guardar todos los cambios en Drive"):
     with st.spinner("Sincronizando con Google Drive..."):
