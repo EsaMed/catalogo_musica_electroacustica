@@ -51,7 +51,7 @@ with col1:
 
 # --- VISUALIZACIÓN Y EDICIÓN DE LA TABLA ---
 st.subheader("Catálogo")
-st.info("💡 Haz doble clic en una celda para editar. Los nombres repetidos están ocultos para mayor claridad.")
+st.info("💡 Haz doble clic en una celda para editar.")
 
 # 1. Filtramos el DataFrame original según la búsqueda
 df_filtrado = st.session_state.df
