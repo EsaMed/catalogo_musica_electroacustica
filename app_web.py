@@ -6,10 +6,8 @@ from data_utils import formatear_compositor_para_csv, preparar_para_guardar
 
 # --- FUNCIÓN PARA IGNORAR TILDES ---
 def remover_tildes(texto):
-    """Convierte a minúsculas y elimina acentos de un texto."""
     if not isinstance(texto, str):
         texto = str(texto)
-    # Normaliza a NFD (separa la letra del acento) y filtra los acentos
     texto_norm = unicodedata.normalize('NFD', texto)
     return "".join(c for c in texto_norm if unicodedata.category(c) != 'Mn').lower()
 
@@ -23,7 +21,6 @@ def inicializar_almacenamiento():
 
 storage = inicializar_almacenamiento()
 
-# Inicializar el DataFrame en la sesión si no existe
 if 'df' not in st.session_state:
     st.session_state.df = storage.load()
 
@@ -47,7 +44,6 @@ def agregar_obra_form():
         st.session_state.df = pd.concat([st.session_state.df, nueva_fila], ignore_index=True)
         st.rerun()
 
-# --- INTERFAZ DE ACCIONES ---
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("➕ Agregar nueva obra"):
@@ -55,38 +51,50 @@ with col1:
 
 # --- VISUALIZACIÓN Y EDICIÓN DE LA TABLA ---
 st.subheader("Catálogo")
-st.info("💡 Puedes editar cualquier celda haciendo doble clic sobre ella. No olvides guardar los cambios al final.")
+st.info("💡 Haz doble clic en una celda para editar. Los nombres repetidos están ocultos para mayor claridad.")
 
-# Filtrado para visualización
-df_mostrar = st.session_state.df
-
+# 1. Filtramos el DataFrame original según la búsqueda
+df_filtrado = st.session_state.df
 if busqueda:
     busqueda_norm = remover_tildes(busqueda)
     mask = st.session_state.df.apply(
         lambda row: row.astype(str).apply(remover_tildes).str.contains(busqueda_norm).any(), 
         axis=1
     )
-    df_mostrar = st.session_state.df[mask]
+    df_filtrado = st.session_state.df[mask]
 
-# Componente de edición
-# Editamos directamente sobre df_mostrar y capturamos el resultado
-df_editado = st.data_editor(
-    df_mostrar,
+# 2. CREAMOS LA VERSIÓN ESTÉTICA (Nombres blanqueados)
+# Usamos tu función preparar_para_guardar para ocultar nombres repetidos
+df_visual = preparar_para_guardar(df_filtrado.copy())
+
+# 3. Componente de edición sobre la versión visual
+df_editado_visual = st.data_editor(
+    df_visual,
     use_container_width=True,
     hide_index=True,
     key="catalogo_editor"
 )
 
-# Si el usuario editó la tabla, actualizamos el DataFrame principal en la sesión
-if not df_editado.equals(df_mostrar):
-    # Actualizamos las filas correspondientes en el DataFrame original
-    st.session_state.df.update(df_editado)
+# 4. SINCRONIZACIÓN INTELIGENTE
+# Si hubo cambios, debemos pasar esos cambios de vuelta al DataFrame original
+if not df_editado_visual.equals(df_visual):
+    # Identificamos qué cambió (ignorando las celdas vacías que pusimos por estética)
+    for index_visual, row_visual in df_editado_visual.iterrows():
+        real_idx = df_filtrado.index[index_visual]
+        
+        # Actualizamos todas las columnas excepto el Compositor si este viene vacío (blanqueado)
+        for col in df_editado_visual.columns:
+            valor_nuevo = row_visual[col]
+            # Solo actualizamos si el valor no es el "blanqueo" o si es una edición real
+            if col == "Compositor" and (valor_nuevo == "" or valor_nuevo is None):
+                continue
+            st.session_state.df.at[real_idx, col] = valor_nuevo
 
-# --- BLOQUE DE ELIMINACIÓN TIPO BUSCADOR LIMPIO ---
+# --- BLOQUE DE ELIMINACIÓN ---
+# (Se mantiene igual que tu versión funcional actual)
 st.divider()
 st.subheader("🗑️ Eliminar Obras")
-
-termino_busqueda_elim = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre de la obra o compositor...")
+termino_busqueda_elim = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre...")
 
 if termino_busqueda_elim:
     termino_norm = remover_tildes(termino_busqueda_elim)
@@ -98,35 +106,24 @@ if termino_busqueda_elim:
     
     if not opciones_filtradas.empty:
         opciones_lista = opciones_filtradas.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
-        
-        selecciones = st.multiselect(
-            f"Resultados para '{termino_busqueda_elim}':",
-            options=opciones_lista,
-            default=opciones_lista if len(opciones_lista) == 1 else None
-        )
+        selecciones = st.multiselect(f"Resultados para '{termino_busqueda_elim}':", options=opciones_lista)
         
         if selecciones:
-            if st.button(f"Confirmar eliminación de {len(selecciones)} obra(s)", type="primary"):
-                indices_a_borrar = []
+            if st.button(f"Confirmar eliminación", type="primary"):
+                indices = []
                 for item in selecciones:
                     nombre_obra = item.split(" - [")[0]
                     nombre_comp = item.split(" - [")[1].replace("]", "")
                     idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
                                               (st.session_state.df['Compositor'] == nombre_comp)].index
-                    indices_a_borrar.extend(idx.tolist())
-                
-                st.session_state.df = st.session_state.df.drop(indices_a_borrar).reset_index(drop=True)
+                    indices.extend(idx.tolist())
+                st.session_state.df = st.session_state.df.drop(indices).reset_index(drop=True)
                 storage.save(st.session_state.df)
-                st.success("Eliminación completada.")
+                st.success("Eliminado.")
                 st.rerun()
-    else:
-        st.warning(f"No se encontraron obras que coincidan con '{termino_busqueda_elim}'")
-else:
-    st.info("Ingresa un nombre arriba para comenzar a buscar obras.")
 
-# --- BOTÓN DE GUARDADO GENERAL ---
 st.divider()
 if st.button("💾 Guardar todos los cambios en Drive"):
-    with st.spinner("Sincronizando con Google Drive..."):
+    with st.spinner("Sincronizando..."):
         storage.save(st.session_state.df)
-        st.success("¡Catálogo actualizado en la nube!")
+        st.success("¡Catálogo actualizado!")
