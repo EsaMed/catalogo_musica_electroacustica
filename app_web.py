@@ -23,6 +23,7 @@ def inicializar_almacenamiento():
 
 storage = inicializar_almacenamiento()
 
+# Inicializar el DataFrame en la sesión si no existe
 if 'df' not in st.session_state:
     st.session_state.df = storage.load()
 
@@ -46,39 +47,49 @@ def agregar_obra_form():
         st.session_state.df = pd.concat([st.session_state.df, nueva_fila], ignore_index=True)
         st.rerun()
 
+# --- INTERFAZ DE ACCIONES ---
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("➕ Agregar nueva obra"):
         agregar_obra_form()
 
-# --- VISUALIZACIÓN DE LA TABLA ---
+# --- VISUALIZACIÓN Y EDICIÓN DE LA TABLA ---
 st.subheader("Catálogo")
+st.info("💡 Puedes editar cualquier celda haciendo doble clic sobre ella. No olvides guardar los cambios al final.")
 
-df_estetico = preparar_para_guardar(st.session_state.df)
+# Filtrado para visualización
+df_mostrar = st.session_state.df
 
 if busqueda:
-    # Normalizamos la búsqueda del usuario
     busqueda_norm = remover_tildes(busqueda)
-    # Aplicamos la normalización a cada celda de la fila para comparar
     mask = st.session_state.df.apply(
         lambda row: row.astype(str).apply(remover_tildes).str.contains(busqueda_norm).any(), 
         axis=1
     )
-    df_estetico = df_estetico[mask]
+    df_mostrar = st.session_state.df[mask]
 
-st.dataframe(df_estetico, use_container_width=True, hide_index=True)
+# Componente de edición
+# Editamos directamente sobre df_mostrar y capturamos el resultado
+df_editado = st.data_editor(
+    df_mostrar,
+    use_container_width=True,
+    hide_index=True,
+    key="catalogo_editor"
+)
+
+# Si el usuario editó la tabla, actualizamos el DataFrame principal en la sesión
+if not df_editado.equals(df_mostrar):
+    # Actualizamos las filas correspondientes en el DataFrame original
+    st.session_state.df.update(df_editado)
 
 # --- BLOQUE DE ELIMINACIÓN TIPO BUSCADOR LIMPIO ---
 st.divider()
 st.subheader("🗑️ Eliminar Obras")
 
-termino_busqueda = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre de la obra o compositor...")
+termino_busqueda_elim = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre de la obra o compositor...")
 
-if termino_busqueda:
-    # Normalizamos el término de búsqueda
-    termino_norm = remover_tildes(termino_busqueda)
-    
-    # Filtramos las opciones ignorando tildes
+if termino_busqueda_elim:
+    termino_norm = remover_tildes(termino_busqueda_elim)
     mask_elim = st.session_state.df.apply(
         lambda row: row.astype(str).apply(remover_tildes).str.contains(termino_norm).any(), 
         axis=1
@@ -89,10 +100,9 @@ if termino_busqueda:
         opciones_lista = opciones_filtradas.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
         
         selecciones = st.multiselect(
-            f"Resultados para '{termino_busqueda}':",
+            f"Resultados para '{termino_busqueda_elim}':",
             options=opciones_lista,
-            default=opciones_lista if len(opciones_lista) == 1 else None,
-            help="Selecciona de la lista los que realmente quieres borrar"
+            default=opciones_lista if len(opciones_lista) == 1 else None
         )
         
         if selecciones:
@@ -110,10 +120,11 @@ if termino_busqueda:
                 st.success("Eliminación completada.")
                 st.rerun()
     else:
-        st.warning(f"No se encontraron obras que coincidan con '{termino_busqueda}'")
+        st.warning(f"No se encontraron obras que coincidan con '{termino_busqueda_elim}'")
 else:
     st.info("Ingresa un nombre arriba para comenzar a buscar obras.")
 
+# --- BOTÓN DE GUARDADO GENERAL ---
 st.divider()
 if st.button("💾 Guardar todos los cambios en Drive"):
     with st.spinner("Sincronizando con Google Drive..."):
