@@ -13,6 +13,8 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
+
 
 # Utilidades de proyecto
 from data_utils import normalizar_compositor, unificar_compositores, preparar_para_guardar
@@ -36,37 +38,47 @@ class DriveStorage(CatalogStorage):
         creds = None
         is_web = False
 
-        # 1. INTENTO PARA LA WEB (Blindado contra errores de Streamlit)
+       # 1. INTENTO PARA LA WEB (Service Account – Streamlit Cloud)
         try:
-            if "google" in st.secrets:
-                token_info = json.loads(st.secrets["google"]["token"])
-                creds = Credentials.from_authorized_user_info(token_info, SCOPES)
+            if "google" in st.secrets and "service_account" in st.secrets["google"]:
+                service_account_info = json.loads(
+                    st.secrets["google"]["service_account"]
+                )
+                creds = service_account.Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=SCOPES
+                )
                 is_web = True
-        except Exception:
-            # Si no hay secretos (entorno local), simplemente ignoramos
-            pass
+        except Exception as e:
+            if not os.path.exists(self.token_path):
+                st.warning(f"Service Account no cargó correctamente: {e}")
         
         # 2. INTENTO LOCAL (Si no estamos en la web y el archivo existe)
         if not is_web and os.path.exists(token_path):
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
 
-        # 3. RENOVACIÓN DE TOKEN (Si expiró)
-        if creds and creds.expired and creds.refresh_token:
-            from google.auth.transport.requests import Request
+        # 3. RENOVACIÓN DE TOKEN (solo OAuth local, NO service account)
+        if not is_web and creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            # Solo guardamos el archivo si estamos en local
-            if not is_web:
-                with open(self.token_path, "w") as f:
-                    f.write(creds.to_json())
+            with open(self.token_path, "w") as f:
+                f.write(creds.to_json())
 
-        # 4. LOGIN INTERACTIVO (Solo si falló todo lo anterior y no es web)
+        # 4. LOGIN INTERACTIVO 
+        
         if not creds or not creds.valid:
             if is_web:
-                st.error("Error crítico: Las credenciales de la web no son válidas.")
+                st.error("Error crítico: Service Account inválida en Streamlit Cloud.")
                 st.stop()
             else:
-                flow = InstalledAppFlow.from_client_secrets_file(self.credentials_path, SCOPES)
-                creds = flow.run_local_server(port=0, access_type='offline', prompt='consent')
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.credentials_path,
+                    SCOPES
+                )
+                creds = flow.run_local_server(
+                    port=0,
+                    access_type="offline",
+                    prompt="consent"
+                )
                 with open(self.token_path, "w") as f:
                     f.write(creds.to_json())
 
