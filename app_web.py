@@ -1,11 +1,11 @@
 import streamlit as st
 import json
 
-#st.write("Secrets keys:", st.secrets.keys())
+st.write("Secrets keys:", st.secrets.keys())
 
-i#f "google" in st.secrets:
-#    st.write("Google secret found")
-#    st.write("Google keys:", st.secrets["google"].keys())
+if "google" in st.secrets:
+    st.write("Google secret found")
+    st.write("Google keys:", st.secrets["google"].keys())
 
 
 import pandas as pd
