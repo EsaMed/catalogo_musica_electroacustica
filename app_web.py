@@ -1,12 +1,5 @@
 import streamlit as st
-import json
-
-st.write("Secrets keys:", st.secrets.keys())
-
-if "google" in st.secrets:
-    st.write("Google secret found")
-    st.write("Google keys:", st.secrets["google"].keys())
-
+#import json
 
 import pandas as pd
 import unicodedata
