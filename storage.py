@@ -63,11 +63,10 @@ class DriveStorage(CatalogStorage):
             with open(self.token_path, "w") as f:
                 f.write(creds.to_json())
 
-        # 4. LOGIN INTERACTIVO 
-        
-        if not creds or not creds.valid:
+        # 4. LOGIN INTERACTIVO (SOLO OAuth local)
+        if not creds:
             if is_web:
-                st.error("Error crítico: Service Account inválida en Streamlit Cloud.")
+                st.error("Error crítico: Service Account no cargó en Streamlit Cloud.")
                 st.stop()
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
@@ -81,6 +80,7 @@ class DriveStorage(CatalogStorage):
                 )
                 with open(self.token_path, "w") as f:
                     f.write(creds.to_json())
+
 
         # CREACIÓN DEL SERVICIO ÚNICO
         self.service = build("drive", "v3", credentials=creds)
