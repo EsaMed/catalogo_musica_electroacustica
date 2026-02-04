@@ -58,11 +58,18 @@ st.info("💡 Haz doble clic en una celda para editar.")
 # 1. Filtramos el DataFrame original según la búsqueda
 df_filtrado = st.session_state.df
 if busqueda:
-    busqueda_norm = remover_tildes(busqueda)
+    busqueda_norm = remover_tildes(busqueda).split()
     mask = st.session_state.df.apply(
-        lambda row: row.astype(str).apply(remover_tildes).str.contains(busqueda_norm).any(), 
+        lambda row: all(
+            row.astype(str)
+            .apply(remover_tildes)
+            .str.contains(token)
+            .any()
+            for token in busqueda_norm
+        ),
         axis=1
     )
+
     df_filtrado = st.session_state.df[mask]
 
 # 2. CREAMOS LA VERSIÓN ESTÉTICA (Nombres blanqueados)
