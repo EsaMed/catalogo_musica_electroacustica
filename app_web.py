@@ -15,6 +15,16 @@ def remover_tildes(texto):
 
 st.set_page_config(page_title="Catálogo de Música Electroacústica", layout="wide")
 
+#-- Función para corregir busqueda del eliminador ---
+def coincide_busqueda(texto, busqueda):
+    if not texto or not busqueda:
+        return False
+
+    texto_norm = remover_tildes(texto)
+    palabras = remover_tildes(busqueda).split()
+
+    return all(p in texto_norm for p in palabras)
+
 FILE_ID = "1yu0nemxng0i4Qc_rlTnx7AackuJbebJX"
 
 @st.cache_resource
@@ -106,11 +116,13 @@ st.subheader("🗑️ Eliminar Obras")
 termino_busqueda_elim = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre...")
 
 if termino_busqueda_elim:
-    termino_norm = remover_tildes(termino_busqueda_elim)
     mask_elim = st.session_state.df.apply(
-        lambda row: row.astype(str).apply(remover_tildes).str.contains(termino_norm).any(), 
+        lambda row: row.astype(str).apply(
+            lambda cell: coincide_busqueda(cell, termino_busqueda_elim)
+        ).any(),
         axis=1
     )
+
     opciones_filtradas = st.session_state.df[mask_elim]
     
     if not opciones_filtradas.empty:
