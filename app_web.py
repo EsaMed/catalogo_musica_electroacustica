@@ -34,6 +34,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ---BLOQUEAR BARRA LATERAL ---
+st.markdown("""
+    <style>
+    /* Oculta la flecha/botón para colapsar el sidebar */
+    [data-testid="stSidebarCollapsedControl"] {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 FILE_ID = "1yu0nemxng0i4Qc_rlTnx7AackuJbebJX"
 
 @st.cache_resource
