@@ -137,7 +137,7 @@ with tab_vista:
         grupos = df_sorted.groupby("Compositor")
 
         for compositor, obras in grupos:
-            with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=True):
+            with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=False):
                 # Mostramos las obras sin repetir la columna compositor
                 cols_mostrar = [c for c in obras.columns if c != "Compositor"]
                 st.dataframe(
