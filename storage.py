@@ -85,6 +85,7 @@ class DriveStorage(CatalogStorage):
         # CREACIÓN DEL SERVICIO ÚNICO
         self.service = build("drive", "v3", credentials=creds)
 
+
     def load(self) -> pd.DataFrame:
         # Usamos self.service directamente
         request = self.service.files().get_media(fileId=self.file_id)
@@ -98,7 +99,9 @@ class DriveStorage(CatalogStorage):
         buf.seek(0)
         df = pd.read_csv(buf, encoding="utf-8-sig", index_col=False)
 
+        # Mantenemos esta limpieza al cargar por seguridad
         if "Compositor" in df.columns:
+            # Aseguramos que cargamos datos limpios en memoria
             df["Compositor"] = df["Compositor"].replace("", pd.NA).ffill()
             df["Compositor"] = df["Compositor"].apply(normalizar_compositor)
             df = unificar_compositores(df)
@@ -106,8 +109,12 @@ class DriveStorage(CatalogStorage):
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        df_visual = preparar_para_guardar(df)
-        csv_bytes = df_visual.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        # CORRECCIÓN: NO usamos preparar_para_guardar(df).
+        # Queremos guardar la tabla completa, con todos los datos en cada fila.
+        
+        # Convertimos directamente el DF completo a CSV bytes
+        csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        
         media = MediaIoBaseUpload(io.BytesIO(csv_bytes), mimetype="text/csv", resumable=True)
 
         # Usamos self.service directamente
