@@ -1,92 +1,126 @@
 import streamlit as st
-#import json
-
 import pandas as pd
 import unicodedata
+
 from storage import DriveStorage
 from data_utils import formatear_compositor_para_csv, preparar_para_guardar
 
-# --- FUNCIÓN PARA IGNORAR TILDES ---
+
+# =====================================================
+# UTILIDADES
+# =====================================================
+
 def remover_tildes(texto):
     if not isinstance(texto, str):
         texto = str(texto)
-    texto_norm = unicodedata.normalize('NFD', texto)
-    return "".join(c for c in texto_norm if unicodedata.category(c) != 'Mn').lower()
+    texto_norm = unicodedata.normalize("NFD", texto)
+    return "".join(c for c in texto_norm if unicodedata.category(c) != "Mn").lower()
 
-st.set_page_config(page_title="Catálogo de Música Electroacústica", layout="wide")
 
-#-- Función para corregir busqueda del eliminador ---
 def coincide_busqueda(texto, busqueda):
     if not texto or not busqueda:
         return False
-
     texto_norm = remover_tildes(texto)
     palabras = remover_tildes(busqueda).split()
-
     return all(p in texto_norm for p in palabras)
 
+
+# =====================================================
+# CONFIGURACIÓN APP
+# =====================================================
+
+st.set_page_config(
+    page_title="Catálogo de Música Electroacústica",
+    layout="wide"
+)
+
 FILE_ID = "1yu0nemxng0i4Qc_rlTnx7AackuJbebJX"
+
 
 @st.cache_resource
 def inicializar_almacenamiento():
     return DriveStorage(file_id=FILE_ID)
 
+
 storage = inicializar_almacenamiento()
 
-if 'df' not in st.session_state:
+if "df" not in st.session_state:
     st.session_state.df = storage.load()
+
+
+# =====================================================
+# UI PRINCIPAL
+# =====================================================
 
 st.title("Editor de Catálogo de Música Electroacústica")
 
-# --- BLOQUE DE BÚSQUEDA ---
-busqueda = st.text_input("🔍 Buscar en el catálogo:", placeholder="Ej: Juan Amenábar")
+# -----------------------------------------------------
+# 🔍 BÚSQUEDA
+# -----------------------------------------------------
 
-# --- CUADRO DE DIÁLOGO PARA AGREGAR ---
+busqueda = st.text_input(
+    "🔍 Buscar en el catálogo:",
+    placeholder="Ej: Juan Amenábar"
+)
+
+
+# -----------------------------------------------------
+# ➕ AGREGAR OBRA
+# -----------------------------------------------------
+
 @st.dialog("Agregar nueva obra")
 def agregar_obra_form():
     datos_nuevos = {}
+
     for col in st.session_state.df.columns:
         datos_nuevos[col] = st.text_input(f"{col}:")
-    
-    if st.button("Confirmar Registro"):
+
+    if st.button("Confirmar registro"):
         if "Compositor" in datos_nuevos:
-            datos_nuevos["Compositor"] = formatear_compositor_para_csv(datos_nuevos["Compositor"])
-        
+            datos_nuevos["Compositor"] = formatear_compositor_para_csv(
+                datos_nuevos["Compositor"]
+            )
+
         nueva_fila = pd.DataFrame([datos_nuevos])
-        st.session_state.df = pd.concat([st.session_state.df, nueva_fila], ignore_index=True)
+        st.session_state.df = pd.concat(
+            [st.session_state.df, nueva_fila],
+            ignore_index=True
+        )
         st.rerun()
+
 
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("➕ Agregar nueva obra"):
         agregar_obra_form()
 
-# --- VISUALIZACIÓN Y EDICIÓN DE LA TABLA ---
-st.subheader("Catálogo")
-st.info("💡 Haz doble clic en una celda para editar.")
 
-# 1. Filtramos el DataFrame original según la búsqueda
-df_filtrado = st.session_state.df
+# -----------------------------------------------------
+# 📋 TABLA (EDICIÓN SEGURA)
+# -----------------------------------------------------
+
+st.subheader("Catálogo")
+st.info("💡 Doble clic para editar. La columna Compositor no se guarda vacía.")
+
+df_original = st.session_state.df
+
+# --- Filtrado ---
+df_filtrado = df_original
 if busqueda:
-    busqueda_norm = remover_tildes(busqueda).split()
-    mask = st.session_state.df.apply(
-        lambda row: all(
-            row.astype(str)
-            .apply(remover_tildes)
-            .str.contains(token)
-            .any()
-            for token in busqueda_norm
+    tokens = remover_tildes(busqueda).split()
+    mask = df_original.apply(
+        lambda row: any(
+            all(t in remover_tildes(str(cell)) for t in tokens)
+            for cell in row
         ),
         axis=1
     )
+    df_filtrado = df_original[mask]
 
-    df_filtrado = st.session_state.df[mask]
-
-# 2. CREAMOS LA VERSIÓN ESTÉTICA (Nombres blanqueados)
-# Usamos tu función preparar_para_guardar para ocultar nombres repetidos
+# --- Vista estética (blanquea repetidos SOLO para mostrar) ---
 df_visual = preparar_para_guardar(df_filtrado.copy())
 
-# 3. Componente de edición sobre la versión visual
+# --- Editor ---
 df_editado_visual = st.data_editor(
     df_visual,
     use_container_width=True,
@@ -94,26 +128,32 @@ df_editado_visual = st.data_editor(
     key="catalogo_editor"
 )
 
-# 4. SINCRONIZACIÓN INTELIGENTE
-# Si hubo cambios, debemos pasar esos cambios de vuelta al DataFrame original
+# --- Sincronización segura ---
 if not df_editado_visual.equals(df_visual):
-    # Identificamos qué cambió (ignorando las celdas vacías que pusimos por estética)
-    for index_visual, row_visual in df_editado_visual.iterrows():
-        real_idx = df_filtrado.index[index_visual]
-        
-        # Actualizamos todas las columnas excepto el Compositor si este viene vacío (blanqueado)
-        for col in df_editado_visual.columns:
-            valor_nuevo = row_visual[col]
-            # Solo actualizamos si el valor no es el "blanqueo" o si es una edición real
-            if col == "Compositor" and (valor_nuevo == "" or valor_nuevo is None):
-                continue
-            st.session_state.df.at[real_idx, col] = valor_nuevo
+    for i_visual, fila_visual in df_editado_visual.iterrows():
+        idx_real = df_filtrado.index[i_visual]
 
-# --- BLOQUE DE ELIMINACIÓN ---
-# (Se mantiene igual que tu versión funcional actual)
+        for col in df_visual.columns:
+            nuevo_valor = fila_visual[col]
+
+            # Nunca sobreescribimos compositor con vacío visual
+            if col == "Compositor" and (nuevo_valor == "" or pd.isna(nuevo_valor)):
+                continue
+
+            st.session_state.df.at[idx_real, col] = nuevo_valor
+
+
+# -----------------------------------------------------
+# 🗑️ ELIMINAR OBRAS
+# -----------------------------------------------------
+
 st.divider()
-st.subheader("🗑️ Eliminar Obras")
-termino_busqueda_elim = st.text_input("Buscar obras para eliminar:", placeholder="Escribe el nombre...")
+st.subheader("🗑️ Eliminar obras")
+
+termino_busqueda_elim = st.text_input(
+    "Buscar obras para eliminar:",
+    placeholder="Ej: Variaciones"
+)
 
 if termino_busqueda_elim:
     mask_elim = st.session_state.df.apply(
@@ -123,28 +163,89 @@ if termino_busqueda_elim:
         axis=1
     )
 
-    opciones_filtradas = st.session_state.df[mask_elim]
-    
-    if not opciones_filtradas.empty:
-        opciones_lista = opciones_filtradas.apply(lambda x: f"{x['Obra']} - [{x['Compositor']}]", axis=1).tolist()
-        selecciones = st.multiselect(f"Resultados para '{termino_busqueda_elim}':", options=opciones_lista)
-        
-        if selecciones:
-            if st.button(f"Confirmar eliminación", type="primary"):
-                indices = []
-                for item in selecciones:
-                    nombre_obra = item.split(" - [")[0]
-                    nombre_comp = item.split(" - [")[1].replace("]", "")
-                    idx = st.session_state.df[(st.session_state.df['Obra'] == nombre_obra) & 
-                                              (st.session_state.df['Compositor'] == nombre_comp)].index
-                    indices.extend(idx.tolist())
-                st.session_state.df = st.session_state.df.drop(indices).reset_index(drop=True)
-                storage.save(st.session_state.df)
-                st.success("Eliminado.")
-                st.rerun()
+    opciones = st.session_state.df[mask_elim]
+
+    if not opciones.empty:
+        lista = opciones.apply(
+            lambda x: f"{x['Obra']} - [{x['Compositor']}]",
+            axis=1
+        ).tolist()
+
+        seleccion = st.multiselect("Resultados:", lista)
+
+        if seleccion and st.button("Confirmar eliminación", type="primary"):
+            indices = []
+            for item in seleccion:
+                obra, comp = item.split(" - [")
+                comp = comp.replace("]", "")
+                idx = st.session_state.df[
+                    (st.session_state.df["Obra"] == obra) &
+                    (st.session_state.df["Compositor"] == comp)
+                ].index
+                indices.extend(idx.tolist())
+
+            st.session_state.df = (
+                st.session_state.df
+                .drop(indices)
+                .reset_index(drop=True)
+            )
+
+            storage.save(st.session_state.df)
+            st.success("Obras eliminadas.")
+            st.rerun()
+
+
+# -----------------------------------------------------
+# 🧰 MANTENIMIENTO DEL CATÁLOGO
+# -----------------------------------------------------
+
+st.divider()
+st.subheader("🧰 Mantenimiento del catálogo")
+st.caption("Herramientas internas para limpiar y normalizar el CSV")
+
+col_m1, col_m2, col_m3 = st.columns(3)
+
+# --- Normalizar compositores ---
+with col_m1:
+    if st.button("🎼 Normalizar compositores"):
+        st.session_state.df["Compositor"] = (
+            st.session_state.df["Compositor"]
+            .astype(str)
+            .apply(formatear_compositor_para_csv)
+        )
+        st.success("Compositores normalizados.")
+
+# --- Detectar duplicados ---
+with col_m2:
+    if st.button("🔁 Detectar duplicados"):
+        duplicados = st.session_state.df[
+            st.session_state.df.duplicated(
+                subset=["Obra", "Compositor"],
+                keep=False
+            )
+        ]
+
+        if duplicados.empty:
+            st.success("No hay duplicados.")
+        else:
+            st.warning(f"{len(duplicados)} filas duplicadas.")
+            st.dataframe(duplicados, use_container_width=True)
+
+# --- Limpiar espacios ---
+with col_m3:
+    if st.button("🧹 Limpiar espacios"):
+        st.session_state.df = st.session_state.df.applymap(
+            lambda x: x.strip() if isinstance(x, str) else x
+        )
+        st.success("Espacios eliminados.")
+
+
+# -----------------------------------------------------
+# 💾 GUARDAR
+# -----------------------------------------------------
 
 st.divider()
 if st.button("💾 Guardar todos los cambios en Drive"):
-    with st.spinner("Sincronizando..."):
+    with st.spinner("Sincronizando con Drive…"):
         storage.save(st.session_state.df)
-        st.success("¡Catálogo actualizado!")
+        st.success("Catálogo actualizado correctamente.")
