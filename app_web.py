@@ -259,9 +259,10 @@ if termino_busqueda_elim:
         st.info("No se encontraron obras con ese nombre.")
 
 # -----------------------------------------------------
-# 🧰 MANTENIMIENTO (Limpio)
+# MANTENIMIENTO (Limpio)
 # -----------------------------------------------------
 
+"""
 st.divider()
 st.subheader("Herramientas de Limpieza")
 
@@ -297,7 +298,7 @@ with col_m3:
             lambda x: x.strip() if isinstance(x, str) else x
         )
         st.success("Espacios al inicio y final eliminados.")
-
+"""
 # -----------------------------------------------------
 # 💾 GUARDAR FINAL
 # -----------------------------------------------------
