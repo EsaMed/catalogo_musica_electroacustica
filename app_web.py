@@ -71,7 +71,7 @@ st.title("Editor de Catálogo de Música Electroacústica")
 
 busqueda = st.text_input(
     "🔍 Buscar en el catálogo:",
-    placeholder="Ej: Juan Amenábar o nombre de obra"
+    placeholder="Ej: Compositor, año, nombre de obra"
 )
 
 # -----------------------------------------------------
@@ -178,47 +178,63 @@ with tab_edicion:
 # -----------------------------------------------------
 
 st.divider()
-with st.expander("🗑️ Zona de Eliminación"):
-    termino_busqueda_elim = st.text_input(
-        "Buscar obras para eliminar:",
-        placeholder="Escribe el nombre de la obra..."
+st.subheader("🗑️ Eliminar una obra")
+
+# El buscador queda visible directamente
+termino_busqueda_elim = st.text_input(
+    "Escribe el nombre de la obra a eliminar:",
+    placeholder="Ej: Variaciones..."
+)
+
+# Lógica de búsqueda y eliminación
+if termino_busqueda_elim:
+    # Filtramos usando la función de búsqueda que ya tienes
+    mask_elim = st.session_state.df.apply(
+        lambda row: row.astype(str).apply(
+            lambda cell: coincide_busqueda(cell, termino_busqueda_elim)
+        ).any(),
+        axis=1
     )
+    opciones = st.session_state.df[mask_elim]
 
-    if termino_busqueda_elim:
-        mask_elim = st.session_state.df.apply(
-            lambda row: row.astype(str).apply(
-                lambda cell: coincide_busqueda(cell, termino_busqueda_elim)
-            ).any(),
+    if not opciones.empty:
+        # Preparamos la lista legible
+        lista = opciones.apply(
+            lambda x: f"{x['Obra']} - [{x['Compositor']}]",
             axis=1
-        )
-        opciones = st.session_state.df[mask_elim]
+        ).tolist()
 
-        if not opciones.empty:
-            lista = opciones.apply(
-                lambda x: f"{x['Obra']} - [{x['Compositor']}]",
-                axis=1
-            ).tolist()
+        # El multiselect aparece abierto/disponible apenas hay resultados
+        seleccion = st.multiselect("Selecciona las obras que quieres borrar:", lista)
 
-            seleccion = st.multiselect("Selecciona las obras a borrar:", lista)
-
-            if seleccion and st.button("Confirmar eliminación", type="primary"):
+        if seleccion:
+            st.warning(f"⚠️ Estás a punto de eliminar {len(seleccion)} obra(s).")
+            
+            if st.button("Confirmar eliminación", type="primary"):
                 indices = []
                 for item in seleccion:
                     partes = item.split(" - [")
                     if len(partes) >= 2:
                         obra = partes[0]
                         comp = partes[1].replace("]", "")
+                        
+                        # Buscamos los índices reales en el DF
                         idx = st.session_state.df[
                             (st.session_state.df["Obra"] == obra) &
                             (st.session_state.df["Compositor"] == comp)
                         ].index
                         indices.extend(idx.tolist())
 
+                # Eliminamos y reseteamos el índice
                 st.session_state.df = st.session_state.df.drop(indices).reset_index(drop=True)
-                # Guardado automático al eliminar para mayor seguridad
+                
+                # Guardado automático de seguridad
                 storage.save(st.session_state.df)
-                st.success("Obras eliminadas y cambios guardados.")
+                
+                st.success("Obras eliminadas correctamente.")
                 st.rerun()
+    else:
+        st.info("No se encontraron obras con ese nombre.")
 
 # -----------------------------------------------------
 # 🧰 MANTENIMIENTO (Limpio)
