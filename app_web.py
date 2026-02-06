@@ -313,5 +313,5 @@ with col_save:
                  df_a_guardar["Compositor"] = df_a_guardar["Compositor"].fillna("").replace("", pd.NA).ffill().fillna("")
             
             storage.save(df_a_guardar)
-        st.balloons()
-        st.success("¡Catálogo actualizado correctamente!")
+        
+        st.success("✅¡Catálogo actualizado correctamente!")
