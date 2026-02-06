@@ -60,8 +60,8 @@ if "df" not in st.session_state:
 # =====================================================
 
 with st.sidebar:
-    st.header("💾 Control de Cambios")
-    st.info("Guarda aquí tus cambios en Drive.")
+    st.header("Guardar cambios en Drive")
+    st.info("💾")
     
     if st.button("GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
         with st.spinner("Sincronizando..."):
@@ -123,7 +123,7 @@ with col_accion_2:
     with st.expander("🗑️ Eliminar una obra (Clic para desplegar)"):
         termino_elim = st.text_input(
             "Buscar obra a eliminar:",
-            placeholder="Escribe el nombre...",
+            placeholder="...",
             key="input_eliminar"
         )
         
@@ -173,7 +173,7 @@ st.divider()
 
 busqueda = st.text_input(
     "🔍 Buscar en el catálogo:",
-    placeholder="Ej: Juan Amenábar o nombre de obra"
+    placeholder="Ej: Obra, compositor, año..."
 )
 
 df_original = st.session_state.df
@@ -230,7 +230,7 @@ with tab_vista:
 
 # --- VISTA 2: TABLA COMPLETA ---
 with tab_tabla:
-    st.caption("Esta vista muestra la tabla completa sin agrupar.")
+    st.caption("Es posible editar sobre las celdas...")
     df_editado = st.data_editor(
         df_filtrado,
         use_container_width=True,
