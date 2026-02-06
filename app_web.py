@@ -60,7 +60,7 @@ if "df" not in st.session_state:
 # 💾 BARRA LATERAL (GUARDADO)
 # =====================================================
 with st.sidebar:
-    if st.button("GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
+    if st.button("💾 GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
             with st.spinner("Sincronizando y ordenando..."):
                 df_a_guardar = st.session_state.df.copy()
                 
