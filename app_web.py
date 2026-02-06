@@ -262,43 +262,43 @@ if termino_busqueda_elim:
 # MANTENIMIENTO (Limpio)
 # -----------------------------------------------------
 
-"""
-st.divider()
-st.subheader("Herramientas de Limpieza")
 
-col_m1, col_m2, col_m3 = st.columns(3)
+# st.divider()
+# st.subheader("Herramientas de Limpieza")
 
-# 1. Normalizar
-with col_m1:
-    if st.button("🎼 Normalizar Compositores"):
-        with st.spinner("Normalizando formatos..."):
-            st.session_state.df["Compositor"] = (
-                st.session_state.df["Compositor"]
-                .astype(str)
-                .apply(formatear_compositor_para_csv)
-            )
-        st.success("Formato 'Apellido, Nombre' aplicado.")
+# col_m1, col_m2, col_m3 = st.columns(3)
 
-# 2. Duplicados
-with col_m2:
-    if st.button("🔁 Buscar Duplicados"):
-        duplicados = st.session_state.df[
-            st.session_state.df.duplicated(subset=["Obra", "Compositor"], keep=False)
-        ]
-        if duplicados.empty:
-            st.info("No hay duplicados exactos.")
-        else:
-            st.warning(f"Se encontraron {len(duplicados)} filas duplicadas:")
-            st.dataframe(duplicados, use_container_width=True)
+# # 1. Normalizar
+# with col_m1:
+#     if st.button("🎼 Normalizar Compositores"):
+#         with st.spinner("Normalizando formatos..."):
+#             st.session_state.df["Compositor"] = (
+#                 st.session_state.df["Compositor"]
+#                 .astype(str)
+#                 .apply(formatear_compositor_para_csv)
+#             )
+#         st.success("Formato 'Apellido, Nombre' aplicado.")
 
-# 3. Espacios
-with col_m3:
-    if st.button("🧹 Limpiar Espacios Extra"):
-        st.session_state.df = st.session_state.df.applymap(
-            lambda x: x.strip() if isinstance(x, str) else x
-        )
-        st.success("Espacios al inicio y final eliminados.")
-"""
+# # 2. Duplicados
+# with col_m2:
+#     if st.button("🔁 Buscar Duplicados"):
+#         duplicados = st.session_state.df[
+#             st.session_state.df.duplicated(subset=["Obra", "Compositor"], keep=False)
+#         ]
+#         if duplicados.empty:
+#             st.info("No hay duplicados exactos.")
+#         else:
+#             st.warning(f"Se encontraron {len(duplicados)} filas duplicadas:")
+#             st.dataframe(duplicados, use_container_width=True)
+
+# # 3. Espacios
+# with col_m3:
+#     if st.button("🧹 Limpiar Espacios Extra"):
+#         st.session_state.df = st.session_state.df.applymap(
+#             lambda x: x.strip() if isinstance(x, str) else x
+#         )
+#         st.success("Espacios al inicio y final eliminados.")
+
 # -----------------------------------------------------
 # 💾 GUARDAR FINAL
 # -----------------------------------------------------
