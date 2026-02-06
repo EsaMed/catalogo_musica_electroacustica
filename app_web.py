@@ -48,11 +48,17 @@ storage = inicializar_almacenamiento()
 if "df" not in st.session_state:
     df_loaded = storage.load()
     
-    # CORRECCIÓN CRÍTICA: Rellenar celdas vacías de 'Compositor' hacia abajo (Forward Fill).
-    # Esto arregla el CSV si venía con formato visual (huecos) del sistema anterior.
     if "Compositor" in df_loaded.columns:
-        df_loaded["Compositor"] = df_loaded["Compositor"].replace("", pd.NA).ffill()
-        # Rellenamos con string vacío cualquier Na que quede (por seguridad)
+        # 1. Limpieza agresiva: Convierte a string, quita espacios. Si queda vacío, pon NA.
+        #    Esto atrapa "", " ", "   ", y nulos.
+        df_loaded["Compositor"] = df_loaded["Compositor"].apply(
+            lambda x: pd.NA if pd.isna(x) or str(x).strip() == "" else str(x).strip()
+        )
+        
+        # 2. Rellenar hacia abajo (Forward Fill)
+        df_loaded["Compositor"] = df_loaded["Compositor"].ffill()
+        
+        # 3. Rellenar nulos residuales (si la primera fila estaba vacía) con string vacío
         df_loaded["Compositor"] = df_loaded["Compositor"].fillna("")
         
     st.session_state.df = df_loaded
@@ -252,18 +258,24 @@ with col_m1:
 
 # --- MANTENIMIENTO: REPARAR HUECOS Y GUARDAR ---
 with col_m2:
-    if st.button("🔗 Reparar huecos en Drive"):
-        with st.spinner("Reparando y guardando..."):
-            # 1. Convertimos espacios vacíos o invisibles en "Nulos" reales
-            st.session_state.df["Compositor"] = st.session_state.df["Compositor"].replace(r'^\s*$', pd.NA, regex=True)
+    if st.button("🔗 Reparar huecos (Fuerza Bruta)"):
+        with st.spinner("Limpiando a fondo y guardando..."):
+            # 1. Limpieza Agresiva (Lambda)
+            #    Forzamos que cualquier cosa que parezca espacio sea un NA real.
+            st.session_state.df["Compositor"] = st.session_state.df["Compositor"].apply(
+                lambda x: pd.NA if pd.isna(x) or str(x).strip() == "" else str(x)
+            )
             
-            # 2. Rellenamos hacia abajo (la magia)
+            # 2. Rellenamos hacia abajo
             st.session_state.df["Compositor"] = st.session_state.df["Compositor"].ffill()
             
-            # 3. Guardamos DIRECTAMENTE en Drive
+            # 3. Quitamos NAs restantes para que el CSV quede limpio (sin 'nan' escritos)
+            st.session_state.df["Compositor"] = st.session_state.df["Compositor"].fillna("")
+
+            # 4. Guardamos
             storage.save(st.session_state.df)
             
-        st.success("¡Listo! Tu CSV en Drive ya tiene todos los nombres completos.")
+        st.success("¡CSV Reparado! Si en Drive se ve igual, descarga el archivo para verificar. La vista previa de Google engaña.")
         st.rerun()
 
 # --- Limpiar espacios ---
