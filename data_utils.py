@@ -53,23 +53,13 @@ def cargar_catalogo(csv_path: str) -> pd.DataFrame:
         df = unificar_compositores(df)
     return df
 
-def preparar_para_guardar(df: pd.DataFrame) -> pd.DataFrame:
+def preparar_para_guardar(df):
     """
-    Prepara una versión 'visual' para CSV:
-    - Ordena por 'Compositor' (A-Z).
-    - Deja en blanco los compositores repetidos (solo visible en el CSV).
+    MODIFICADO: Esta función antes borraba nombres repetidos visualmente.
+    Ahora devolvemos el DataFrame INTACTO para evitar huecos en la base de datos.
+    Se mantiene la definición para no romper compatibilidad con imports antiguos.
     """
-    df2 = df.copy()
-    if "Compositor" in df2.columns:
-        df2.sort_values(by="Compositor", inplace=True, ignore_index=True)
-        comp_prev = None
-        for i in range(len(df2)):
-            comp = df2.at[i, "Compositor"]
-            if comp == comp_prev:
-                df2.at[i, "Compositor"] = ""
-            else:
-                comp_prev = comp
-    return df2
+    return df
 
 def formatear_compositor_para_csv(nombre: str) -> str:
     """

@@ -109,10 +109,11 @@ class DriveStorage(CatalogStorage):
         return df
 
     def save(self, df: pd.DataFrame) -> None:
-        # CORRECCIÓN: NO usamos preparar_para_guardar(df).
-        # Queremos guardar la tabla completa, con todos los datos en cada fila.
+        # --- VERSIÓN CORREGIDA ---
+        # Guardamos el DataFrame DIRECTAMENTE.
+        # Eliminamos la línea que decía "df_visual = preparar_para_guardar(df)"
+        # para que NUNCA se borren los nombres repetidos.
         
-        # Convertimos directamente el DF completo a CSV bytes
         csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
         
         media = MediaIoBaseUpload(io.BytesIO(csv_bytes), mimetype="text/csv", resumable=True)

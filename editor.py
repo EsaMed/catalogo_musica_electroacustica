@@ -128,6 +128,11 @@ class CatalogoEditor(QWidget):
 
         # Carga inicial
         self.df = self.storage.load()
+        if "Compositor" in self.df.columns:
+             self.df["Compositor"] = self.df["Compositor"].replace("", pd.NA).ffill()
+             self.df["Compositor"] = self.df["Compositor"].fillna("")
+        # ---------------------------------------------------------------------
+
         self.mostrar_tabla(self.df)
 
     # ---------------------------
@@ -160,16 +165,22 @@ class CatalogoEditor(QWidget):
         """)
 
 
-        comp_anterior = None
+        #comp_anterior = None
         for i in range(len(df)):
             for j in range(len(df.columns)):
+                # Obtenemos el valor real
                 valor = str(df.iat[i, j]) if not pd.isna(df.iat[i, j]) else ""
 
-                if df.columns[j] == "Compositor":
-                    if valor == comp_anterior:
-                        valor = ""
-                    else:
-                        comp_anterior = valor
+                # --- BLOQUE ELIMINADO/COMENTADO ---
+                # Antes aquí había un if que decía "si valor == comp_anterior: valor = ''"
+                # LO QUITAMOS para que siempre se escriba el nombre real.
+                
+                # if df.columns[j] == "Compositor":
+                #     if valor == comp_anterior:
+                #         valor = ""
+                #     else:
+                #         comp_anterior = valor
+                # ----------------------------------
 
                 item = QTableWidgetItem(valor)
                 item.setFlags(item.flags() | Qt.ItemIsEditable)
