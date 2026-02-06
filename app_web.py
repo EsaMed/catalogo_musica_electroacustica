@@ -60,10 +60,10 @@ if "df" not in st.session_state:
 # =====================================================
 
 with st.sidebar:
-    st.header("Guardar cambios en Drive")
-    st.info("💾")
+    #st.header("Guardar cambios en Drive")
+    #st.info("💾")
     
-    if st.button("GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
+    if st.button("💾 GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
         with st.spinner("Sincronizando..."):
             df_a_guardar = st.session_state.df.copy()
             if "Compositor" in df_a_guardar.columns:
