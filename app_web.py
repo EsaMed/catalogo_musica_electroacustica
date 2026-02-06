@@ -128,29 +128,51 @@ if busqueda:
 # Pestañas
 tab_vista, tab_edicion = st.tabs(["👁️ Vista Catálogo", "✏️ Editar Tabla"])
 
-# --- PESTAÑA 1: VISTA AGRUPADA (Solo Lectura) ---
+# --- PESTAÑA 1: VISTA POR COMPOSITOR (Editable) ---
 with tab_vista:
     if df_filtrado.empty:
         st.info("No se encontraron resultados.")
     else:
+        # Ordenamos
         df_sorted = df_filtrado.sort_values(by="Compositor")
         grupos = df_sorted.groupby("Compositor")
 
-        # LÓGICA DINÁMICA:
-        # Si el usuario escribió algo en el buscador, expandimos automáticamente los resultados.
-        # Si no ha buscado nada, mantenemos todo colapsado para que se vea ordenado.
+        # Lógica de expansión automática al buscar
         estado_expansion = True if busqueda else False
 
         for compositor, obras in grupos:
+            # Creamos el expander
             with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=estado_expansion):
                 
-                # Mostramos las obras sin repetir la columna compositor
+                # 1. Preparamos los datos para mostrar (ocultando columna Compositor)
                 cols_mostrar = [c for c in obras.columns if c != "Compositor"]
-                st.dataframe(
+                
+                # 2. Mostramos el EDITOR en lugar de solo ver
+                # Importante: key=f"editor_{compositor}" hace que cada tabla sea independiente
+                cambios = st.data_editor(
                     obras[cols_mostrar],
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
+                    key=f"editor_{compositor}" # Clave única por compositor
                 )
+
+                # 3. LÓGICA DE GUARDADO EN TIEMPO REAL
+                # Si la tabla editada (cambios) es diferente a la original (obras)...
+                # (Comparamos solo las columnas mostradas para evitar falsos positivos)
+                if not cambios.equals(obras[cols_mostrar]):
+                    
+                    # Iteramos sobre los índices originales de las obras modificadas
+                    for i in cambios.index:
+                        # Recuperamos la fila editada
+                        fila_editada = cambios.loc[i]
+                        
+                        # Actualizamos el DataFrame Maestro (st.session_state.df)
+                        # Usamos 'i' que es el índice original, así es IMPOSIBLE que se corra.
+                        for col in cols_mostrar:
+                            st.session_state.df.at[i, col] = fila_editada[col]
+                    
+                    # Opcional: Mostrar un mensajito discreto de "guardado" o simplemente dejar que fluya
+                    # st.toast(f"Cambios guardados para {compositor}")
 
 # --- PESTAÑA 2: EDITOR (Edición Real) ---
 with tab_edicion:
@@ -182,8 +204,8 @@ st.subheader("🗑️ Eliminar una obra")
 
 # El buscador queda visible directamente
 termino_busqueda_elim = st.text_input(
-    "Escribe el nombre de la obra a eliminar:",
-    placeholder="Ej: Variaciones..."
+    "Busca la obra a eliminar por título, compositor, año, etc.:",
+    placeholder="..."
 )
 
 # Lógica de búsqueda y eliminación
