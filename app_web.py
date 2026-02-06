@@ -60,17 +60,20 @@ if "df" not in st.session_state:
 # 💾 BARRA LATERAL (GUARDADO)
 # =====================================================
 
-with st.sidebar:
-    #st.header("Guardar cambios en Drive")
-    #st.info("💾")
-    
-    if st.button("💾 GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
-        with st.spinner("Sincronizando..."):
+if st.button("GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
+        with st.spinner("Sincronizando y ordenando..."):
             df_a_guardar = st.session_state.df.copy()
+            
             if "Compositor" in df_a_guardar.columns:
+                 # 1. SEGURIDAD: Rellenar huecos para que nadie pierda su autor
                  df_a_guardar["Compositor"] = df_a_guardar["Compositor"].fillna("").replace("", pd.NA).ffill().fillna("")
+                 
+                 # 2. ORDENAR: Alfabéticamente por Compositor y luego por Obra
+                 # Esto asegura que la nueva obra se mueva de la última fila a su lugar correcto.
+                 df_a_guardar = df_a_guardar.sort_values(by=["Compositor", "Obra"], ignore_index=True)
+            
             storage.save(df_a_guardar)
-        st.success("✅ Sincronizado correctamente.")
+        st.success("✅ Guardado y sincronizado en Drive.")
 
 # =====================================================
 # LÓGICA DE AGREGAR OBRA (MODAL / VENTANITA)
