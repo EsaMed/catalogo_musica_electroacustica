@@ -136,8 +136,14 @@ with tab_vista:
         df_sorted = df_filtrado.sort_values(by="Compositor")
         grupos = df_sorted.groupby("Compositor")
 
+        # LÓGICA DINÁMICA:
+        # Si el usuario escribió algo en el buscador, expandimos automáticamente los resultados.
+        # Si no ha buscado nada, mantenemos todo colapsado para que se vea ordenado.
+        estado_expansion = True if busqueda else False
+
         for compositor, obras in grupos:
-            with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=False):
+            with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=estado_expansion):
+                
                 # Mostramos las obras sin repetir la columna compositor
                 cols_mostrar = [c for c in obras.columns if c != "Compositor"]
                 st.dataframe(
