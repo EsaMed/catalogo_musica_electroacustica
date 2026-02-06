@@ -250,21 +250,21 @@ with col_m1:
         )
         st.success("Compositores normalizados.")
 
-# --- Detectar duplicados ---
+# --- MANTENIMIENTO: REPARAR HUECOS Y GUARDAR ---
 with col_m2:
-    if st.button("🔁 Detectar duplicados"):
-        duplicados = st.session_state.df[
-            st.session_state.df.duplicated(
-                subset=["Obra", "Compositor"],
-                keep=False
-            )
-        ]
-
-        if duplicados.empty:
-            st.success("No hay duplicados.")
-        else:
-            st.warning(f"{len(duplicados)} filas duplicadas.")
-            st.dataframe(duplicados, use_container_width=True)
+    if st.button("🔗 Reparar huecos en Drive"):
+        with st.spinner("Reparando y guardando..."):
+            # 1. Convertimos espacios vacíos o invisibles en "Nulos" reales
+            st.session_state.df["Compositor"] = st.session_state.df["Compositor"].replace(r'^\s*$', pd.NA, regex=True)
+            
+            # 2. Rellenamos hacia abajo (la magia)
+            st.session_state.df["Compositor"] = st.session_state.df["Compositor"].ffill()
+            
+            # 3. Guardamos DIRECTAMENTE en Drive
+            storage.save(st.session_state.df)
+            
+        st.success("¡Listo! Tu CSV en Drive ya tiene todos los nombres completos.")
+        st.rerun()
 
 # --- Limpiar espacios ---
 with col_m3:
