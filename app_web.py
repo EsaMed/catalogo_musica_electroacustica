@@ -89,53 +89,33 @@ st.title("Editor de Catálogo Electroacústico")
 # 🛠️ ZONA DE GESTIÓN (AGREGAR / ELIMINAR)
 # -----------------------------------------------------
 
-# Pestañas de gestión
+# Creamos dos pestañas compactas arriba para las acciones
 tab_add, tab_del = st.tabs(["➕ Agregar Obra", "🗑️ Eliminar Obra"])
 
-# --- PESTAÑA AGREGAR (Formulario directo) ---
+# --- PESTAÑA AGREGAR ---
 with tab_add:
-    st.write("Ingresa los datos de la nueva obra:")
-    
-    # Usamos st.form para agrupar los campos y evitar recargas mientras escribes
-    # clear_on_submit=True limpia el formulario automáticamente al guardar.
-    with st.form("form_alta_obra", clear_on_submit=True):
+    @st.dialog("Agregar nueva obra")
+    def agregar_obra_form():
         datos_nuevos = {}
-        
-        # Organizamos los campos en 2 columnas para que no sea una lista eterna
-        col1, col2 = st.columns(2)
-        columnas = list(st.session_state.df.columns)
-        mitad = len(columnas) // 2
-        
-        # Primera mitad de campos
-        with col1:
-            for col in columnas[:mitad]:
-                datos_nuevos[col] = st.text_input(f"{col}:")
-        
-        # Segunda mitad de campos
-        with col2:
-            for col in columnas[mitad:]:
-                datos_nuevos[col] = st.text_input(f"{col}:")
+        # Creamos campos para todas las columnas
+        for col in st.session_state.df.columns:
+            datos_nuevos[col] = st.text_input(f"{col}:")
 
-        st.markdown("---")
-        submitted = st.form_submit_button("Confirmar registro", type="primary")
-
-        if submitted:
-            # 1. Normalización automática del Compositor
+        if st.button("Confirmar registro", type="primary"):
             if "Compositor" in datos_nuevos and datos_nuevos["Compositor"]:
                 datos_nuevos["Compositor"] = formatear_compositor_para_csv(
                     datos_nuevos["Compositor"]
                 )
-
-            # 2. Agregar al DataFrame
             nueva_fila = pd.DataFrame([datos_nuevos])
             st.session_state.df = pd.concat(
                 [st.session_state.df, nueva_fila],
                 ignore_index=True
             )
-            
-            # 3. Feedback inmediato
-            st.success("✅ Obra agregada al listado (Recuerda guardar en Drive al finalizar).")
-            # No usamos st.rerun() aquí para dejar ver el mensaje de éxito y limpiar el form
+            st.rerun()
+
+    # Botón que abre el modal
+    if st.button("Abrir formulario de registro"):
+        agregar_obra_form()
 
 # --- PESTAÑA ELIMINAR ---
 with tab_del:
@@ -186,6 +166,9 @@ with tab_del:
                         st.rerun()
             else:
                 st.caption("No se encontraron coincidencias.")
+
+st.divider()
+
 # -----------------------------------------------------
 # 🔍 BÚSQUEDA Y VISTA PRINCIPAL
 # -----------------------------------------------------
