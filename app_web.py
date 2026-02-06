@@ -31,7 +31,7 @@ st.set_page_config(
     page_title="Catálogo de Música Electroacústica",
     layout="wide",
     page_icon="🎵",
-    initial_sidebar_state="expanded" # Barra lateral abierta por defecto
+    initial_sidebar_state="expanded"
 )
 
 FILE_ID = "1yu0nemxng0i4Qc_rlTnx7AackuJbebJX"
@@ -42,12 +42,10 @@ def inicializar_almacenamiento():
 
 storage = inicializar_almacenamiento()
 
-# --- CARGA DE DATOS (Con blindaje automático) ---
+# --- CARGA DE DATOS (Blindada) ---
 if "df" not in st.session_state:
     with st.spinner("Cargando catálogo..."):
         df_loaded = storage.load()
-        
-        # BLINDAJE: Si vienen huecos del pasado, los rellenamos en memoria al instante.
         if "Compositor" in df_loaded.columns:
             df_loaded["Compositor"] = df_loaded["Compositor"].apply(
                 lambda x: pd.NA if pd.isna(x) or str(x).strip() == "" else str(x).strip()
@@ -58,26 +56,48 @@ if "df" not in st.session_state:
         st.session_state.df = df_loaded
 
 # =====================================================
-# 💾 BARRA LATERAL (GUARDADO PINEADO)
+# 💾 BARRA LATERAL (GUARDADO)
 # =====================================================
 
 with st.sidebar:
     st.header("💾 Control de Cambios")
-    st.info("El botón de guardar está siempre disponible aquí.")
+    st.info("Guarda aquí tus cambios en Drive.")
     
-    # Botón grande y visible
     if st.button("GUARDAR CAMBIOS EN DRIVE", type="primary", use_container_width=True):
         with st.spinner("Sincronizando..."):
-            # Blindaje final antes de guardar
             df_a_guardar = st.session_state.df.copy()
-            
-            # Asegurar consistencia de datos (rellenar huecos)
             if "Compositor" in df_a_guardar.columns:
                  df_a_guardar["Compositor"] = df_a_guardar["Compositor"].fillna("").replace("", pd.NA).ffill().fillna("")
-            
             storage.save(df_a_guardar)
-            
         st.success("✅ Sincronizado correctamente.")
+
+# =====================================================
+# LÓGICA DE AGREGAR OBRA (MODAL / VENTANITA)
+# =====================================================
+
+@st.dialog("Agregar nueva obra")
+def agregar_obra_form():
+    st.write("Ingresa los datos de la nueva obra:")
+    datos_nuevos = {}
+    
+    # Formulario limpio
+    columnas = list(st.session_state.df.columns)
+    for col in columnas:
+        datos_nuevos[col] = st.text_input(f"{col}:")
+
+    if st.button("Confirmar registro", type="primary"):
+        # Normalizar y guardar
+        if "Compositor" in datos_nuevos and datos_nuevos["Compositor"]:
+            datos_nuevos["Compositor"] = formatear_compositor_para_csv(
+                datos_nuevos["Compositor"]
+            )
+
+        nueva_fila = pd.DataFrame([datos_nuevos])
+        st.session_state.df = pd.concat(
+            [st.session_state.df, nueva_fila],
+            ignore_index=True
+        )
+        st.rerun()
 
 # =====================================================
 # UI PRINCIPAL
@@ -86,48 +106,27 @@ with st.sidebar:
 st.title("Editor de Catálogo Electroacústico")
 
 # -----------------------------------------------------
-# 🛠️ ZONA DE GESTIÓN (AGREGAR / ELIMINAR)
+# 🛠️ PANEL DE ACCIONES (2 BOTONES SUPERIORES)
 # -----------------------------------------------------
 
-# Creamos dos pestañas compactas arriba para las acciones
-tab_add, tab_del = st.tabs(["➕ Agregar Obra", "🗑️ Eliminar Obra"])
+# Creamos dos columnas para los botones de acción
+col_accion_1, col_accion_2 = st.columns(2)
 
-# --- PESTAÑA AGREGAR ---
-with tab_add:
-    @st.dialog("Agregar nueva obra")
-    def agregar_obra_form():
-        datos_nuevos = {}
-        # Creamos campos para todas las columnas
-        for col in st.session_state.df.columns:
-            datos_nuevos[col] = st.text_input(f"{col}:")
-
-        if st.button("Confirmar registro", type="primary"):
-            if "Compositor" in datos_nuevos and datos_nuevos["Compositor"]:
-                datos_nuevos["Compositor"] = formatear_compositor_para_csv(
-                    datos_nuevos["Compositor"]
-                )
-            nueva_fila = pd.DataFrame([datos_nuevos])
-            st.session_state.df = pd.concat(
-                [st.session_state.df, nueva_fila],
-                ignore_index=True
-            )
-            st.rerun()
-
-    # Botón que abre el modal
-    if st.button("Abrir formulario de registro"):
+# --- BOTÓN 1: AGREGAR (Abre Ventanita) ---
+with col_accion_1:
+    if st.button("➕ Agregar nueva obra", use_container_width=True):
         agregar_obra_form()
 
-# --- PESTAÑA ELIMINAR ---
-with tab_del:
-    col_del_1, col_del_2 = st.columns([1, 2])
-    with col_del_1:
+# --- BOTÓN 2: ELIMINAR (Despliega Buscador) ---
+with col_accion_2:
+    # Usamos un expander que actúa visualmente como un botón que despliega herramientas
+    with st.expander("🗑️ Eliminar una obra (Clic para desplegar)"):
         termino_elim = st.text_input(
             "Buscar obra a eliminar:",
             placeholder="Escribe el nombre...",
             key="input_eliminar"
         )
-    
-    with col_del_2:
+        
         if termino_elim:
             mask_elim = st.session_state.df.apply(
                 lambda row: row.astype(str).apply(
@@ -160,7 +159,6 @@ with tab_del:
                                 indices.extend(idx.tolist())
 
                         st.session_state.df = st.session_state.df.drop(indices).reset_index(drop=True)
-                        # Auto-guardado de seguridad al eliminar
                         storage.save(st.session_state.df)
                         st.success("Obras eliminadas.")
                         st.rerun()
@@ -170,7 +168,7 @@ with tab_del:
 st.divider()
 
 # -----------------------------------------------------
-# 🔍 BÚSQUEDA Y VISTA PRINCIPAL
+# 🔍 BÚSQUEDA Y VISTA DEL CATÁLOGO
 # -----------------------------------------------------
 
 busqueda = st.text_input(
@@ -192,23 +190,25 @@ if busqueda:
     )
     df_filtrado = df_original[mask]
 
-# Pestañas de visualización
+# Pestañas de visualización (solo para ver o ver todo)
 tab_vista, tab_tabla = st.tabs(["👁️ Vista Catálogo (Editable)", "✏️ Tabla Completa"])
 
-# --- VISTA 1: ACORDEONES EDITABLES ---
+# --- VISTA 1: ACORDEONES EDITABLES (Segura) ---
 with tab_vista:
     if df_filtrado.empty:
         st.info("No se encontraron resultados.")
     else:
         df_sorted = df_filtrado.sort_values(by="Compositor")
         grupos = df_sorted.groupby("Compositor")
+        
+        # Expande solo si buscas
         estado_expansion = True if busqueda else False
 
         for compositor, obras in grupos:
             with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=estado_expansion):
                 cols_mostrar = [c for c in obras.columns if c != "Compositor"]
                 
-                # Configuración de seguridad para scroll (Texto plano)
+                # Configuración anti-scroll accidental (Texto)
                 configuracion_cols = {
                     "Año": st.column_config.TextColumn("Año", help="Año (Texto)"),
                     "Duración": st.column_config.TextColumn("Duración", help="Duración"),
