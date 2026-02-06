@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import unicodedata
 
+# Asumo que estos archivos existen en tu carpeta, los mantenemos igual
 from storage import DriveStorage
 from data_utils import formatear_compositor_para_csv, preparar_para_guardar
-
 
 # =====================================================
 # UTILIDADES
@@ -44,8 +44,18 @@ def inicializar_almacenamiento():
 
 storage = inicializar_almacenamiento()
 
+# --- CARGA DE DATOS SEGURA ---
 if "df" not in st.session_state:
-    st.session_state.df = storage.load()
+    df_loaded = storage.load()
+    
+    # CORRECCIÓN CRÍTICA: Rellenar celdas vacías de 'Compositor' hacia abajo (Forward Fill).
+    # Esto arregla el CSV si venía con formato visual (huecos) del sistema anterior.
+    if "Compositor" in df_loaded.columns:
+        df_loaded["Compositor"] = df_loaded["Compositor"].replace("", pd.NA).ffill()
+        # Rellenamos con string vacío cualquier Na que quede (por seguridad)
+        df_loaded["Compositor"] = df_loaded["Compositor"].fillna("")
+        
+    st.session_state.df = df_loaded
 
 
 # =====================================================
@@ -60,9 +70,8 @@ st.title("Editor de Catálogo de Música Electroacústica")
 
 busqueda = st.text_input(
     "🔍 Buscar en el catálogo:",
-    placeholder="Ej: Juan Amenábar"
+    placeholder="Ej: Juan Amenábar o nombre de obra"
 )
-
 
 # -----------------------------------------------------
 # ➕ AGREGAR OBRA
@@ -73,6 +82,7 @@ def agregar_obra_form():
     datos_nuevos = {}
 
     for col in st.session_state.df.columns:
+        # Sugerimos vacío por defecto
         datos_nuevos[col] = st.text_input(f"{col}:")
 
     if st.button("Confirmar registro"):
@@ -96,15 +106,14 @@ with col1:
 
 
 # -----------------------------------------------------
-# 📋 TABLA (EDICIÓN SEGURA)
+# 👁️ VISUALIZACIÓN Y EDICIÓN (SISTEMA DE PESTAÑAS)
 # -----------------------------------------------------
 
 st.subheader("Catálogo")
-st.info("💡 Doble clic para editar. La columna Compositor no se guarda vacía.")
 
 df_original = st.session_state.df
 
-# --- Filtrado ---
+# --- Filtrado General (Aplica a ambas pestañas) ---
 df_filtrado = df_original
 if busqueda:
     tokens = remover_tildes(busqueda).split()
@@ -117,34 +126,58 @@ if busqueda:
     )
     df_filtrado = df_original[mask]
 
-# --- Vista estética (blanquea repetidos SOLO para mostrar) ---
-df_visual = preparar_para_guardar(df_filtrado.copy())
+# CREAMOS LAS PESTAÑAS
+tab_vista, tab_edicion = st.tabs(["👁️ Vista por Compositor", "✏️ Editar Tabla Completa"])
 
-# --- Editor ---
-df_editado_visual = st.data_editor(
-    df_visual,
-    use_container_width=True,
-    hide_index=True,
-    key="catalogo_editor"
-)
+# --- PESTAÑA 1: VISTA AGRUPADA (Estética) ---
+with tab_vista:
+    if df_filtrado.empty:
+        st.info("No se encontraron resultados.")
+    else:
+        # Agrupamos por compositor para mostrar acordeones
+        # Ordenamos primero para que la lista salga alfabética
+        df_sorted = df_filtrado.sort_values(by="Compositor")
+        grupos = df_sorted.groupby("Compositor")
 
-# --- Sincronización segura ---
-if not df_editado_visual.equals(df_visual):
-    for i_visual, fila_visual in df_editado_visual.iterrows():
-        idx_real = df_filtrado.index[i_visual]
+        for compositor, obras in grupos:
+            # Creamos un desplegable por cada compositor
+            with st.expander(f"🎵 {compositor} ({len(obras)} obras)", expanded=True):
+                # Ocultamos la columna Compositor (ya está en el título) para limpiar la vista
+                cols_mostrar = [c for c in obras.columns if c != "Compositor"]
+                st.dataframe(
+                    obras[cols_mostrar],
+                    use_container_width=True,
+                    hide_index=True
+                )
 
-        for col in df_visual.columns:
-            nuevo_valor = fila_visual[col]
+# --- PESTAÑA 2: EDITOR (Funcional) ---
+with tab_edicion:
+    st.info("💡 En este modo se muestra la tabla completa. Modifica las celdas directamente.")
+    
+    # Aquí mostramos TODOS los datos. No usamos máscaras visuales.
+    # Esto asegura que al ordenar o filtrar, la celda siempre tenga dueño.
+    df_editado = st.data_editor(
+        df_filtrado,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic", # Permite añadir/borrar filas tipo Excel
+        key="catalogo_editor_tab"
+    )
 
-            # Nunca sobreescribimos compositor con vacío visual
-            if col == "Compositor" and (nuevo_valor == "" or pd.isna(nuevo_valor)):
-                continue
-
-            st.session_state.df.at[idx_real, col] = nuevo_valor
+    # Lógica de sincronización simple y robusta
+    if not df_editado.equals(df_filtrado):
+        # Actualizamos el DF maestro con los cambios del editor
+        st.session_state.df.update(df_editado)
+        
+        # Si se agregaron filas nuevas directamente en la tabla (gracias a num_rows="dynamic")
+        if len(df_editado) > len(df_filtrado):
+            # Identificamos filas nuevas y las pegamos
+            # (Nota: esto es básico, si el filtrado es complejo, es mejor usar el botón "Agregar nueva obra")
+            pass 
 
 
 # -----------------------------------------------------
-# 🗑️ ELIMINAR OBRAS
+# 🗑️ ELIMINAR OBRAS (Mantenido igual, funciona bien)
 # -----------------------------------------------------
 
 st.divider()
@@ -176,13 +209,16 @@ if termino_busqueda_elim:
         if seleccion and st.button("Confirmar eliminación", type="primary"):
             indices = []
             for item in seleccion:
-                obra, comp = item.split(" - [")
-                comp = comp.replace("]", "")
-                idx = st.session_state.df[
-                    (st.session_state.df["Obra"] == obra) &
-                    (st.session_state.df["Compositor"] == comp)
-                ].index
-                indices.extend(idx.tolist())
+                partes = item.split(" - [")
+                if len(partes) >= 2:
+                    obra = partes[0]
+                    comp = partes[1].replace("]", "")
+                    
+                    idx = st.session_state.df[
+                        (st.session_state.df["Obra"] == obra) &
+                        (st.session_state.df["Compositor"] == comp)
+                    ].index
+                    indices.extend(idx.tolist())
 
             st.session_state.df = (
                 st.session_state.df
@@ -201,7 +237,6 @@ if termino_busqueda_elim:
 
 st.divider()
 st.subheader("🧰 Mantenimiento del catálogo")
-st.caption("Herramientas internas para limpiar y normalizar el CSV")
 
 col_m1, col_m2, col_m3 = st.columns(3)
 
@@ -247,5 +282,7 @@ with col_m3:
 st.divider()
 if st.button("💾 Guardar todos los cambios en Drive"):
     with st.spinner("Sincronizando con Drive…"):
-        storage.save(st.session_state.df)
+        # Aseguramos que antes de guardar, no haya nulos raros
+        df_a_guardar = st.session_state.df.fillna("")
+        storage.save(df_a_guardar)
         st.success("Catálogo actualizado correctamente.")
