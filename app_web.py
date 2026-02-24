@@ -107,7 +107,7 @@ def agregar_obra_form():
 # UI PRINCIPAL
 # =====================================================
 
-st.title("Editor de Catálogo Electroacústico")
+st.title("Editor de Catálogo - Obras Electroacústicas de Chile")
 
 # -----------------------------------------------------
 # 🛠️ PANEL DE ACCIONES (2 BOTONES SUPERIORES)
