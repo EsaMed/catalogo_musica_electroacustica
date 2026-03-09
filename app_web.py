@@ -108,7 +108,7 @@ def agregar_obra_form():
         )
 
         #Unifiación de compositores
-        st.session.state.df = unificar_compositores(st.session_state.df)
+        st.session_state.df = unificar_compositores(st.session_state.df)
         st.rerun()
 
 # =====================================================
