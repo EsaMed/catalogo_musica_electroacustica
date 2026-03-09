@@ -4,7 +4,7 @@ import unicodedata
 
 # Importamos solo lo necesario
 from storage import DriveStorage
-from data_utils import formatear_compositor_para_csv
+from data_utils import formatear_compositor_para_csv, unificar_compositores
 
 # =====================================================
 # UTILIDADES INTERNAS
@@ -67,6 +67,11 @@ with st.sidebar:
                 if "Compositor" in df_a_guardar.columns:
                     # 1. SEGURIDAD: Rellenar huecos para que nadie pierda su autor
                     df_a_guardar["Compositor"] = df_a_guardar["Compositor"].fillna("").replace("", pd.NA).ffill().fillna("")
+
+                    # UNIFICADO 9-MARZO
+
+                    df_a_guardar = unificar_compositores(df_a_guardar)
+                    st.session_state.df = df_a_guardar.copy()
                     
                     # 2. ORDENAR: Alfabéticamente por Compositor y luego por Obra
                     # Esto asegura que la nueva obra se mueva de la última fila a su lugar correcto.
@@ -101,6 +106,9 @@ def agregar_obra_form():
             [st.session_state.df, nueva_fila],
             ignore_index=True
         )
+
+        #Unifiación de compositores
+        st.session.state.df = unificar_compositores(st.session_state.df)
         st.rerun()
 
 # =====================================================
