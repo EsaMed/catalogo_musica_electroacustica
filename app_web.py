@@ -171,8 +171,8 @@ with col_accion_2:
                                 indices.extend(idx.tolist())
 
                         st.session_state.df = st.session_state.df.drop(indices).reset_index(drop=True)
-                        storage.save(st.session_state.df)
-                        st.success("Obras eliminadas.")
+                        #storage.save(st.session_state.df)
+                        st.warning("Obras eliminadas. No olvide guardar cambios")
                         st.rerun()
             else:
                 st.caption("No se encontraron coincidencias.")
